@@ -1,167 +1,77 @@
-from fastapi import FastAPI, WebSocket
-import asyncio
-import json
 import os
+import json
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
-# Explicitly load .env.local and override any existing env vars
+# Load environment variables
 load_dotenv(dotenv_path=".env.local", override=True)
 
 app = FastAPI()
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# ---------------------------------------------------------
+# THE MASTER CONSULTATIVE PROMPT
+# ---------------------------------------------------------
+SYSTEM_PROMPT = """You are an elite, consultative Sales Copilot for a YuJa EqualGround Account Executive.
+Your ONLY goal is to analyze the live transcript, act as a business problem-solver, and feed the sales rep the exact next sentence to say to keep the prospect talking.
 
+You are NOT a message reader. You are a DYNAMIC FRAMEWORK designed to facilitate a two-way collaborative discussion, uncover pain, and convert. You are ONLY listening to the PROSPECT'S audio.
+
+CONTEXT - YUJA EQUALGROUND:
+- Product: Digital accessibility software (crucial for Title II compliance).
+- Value Prop: Automates compliance, deep scans PDFs and web pages, prevents costly lawsuits.
+
+THE DYNAMIC PLAYBOOK:
+1. IF PROSPECT GIVES A COLD/SHORT ANSWER:
+   -> Tactic: PEEL THE ONION
+   -> Response: Acknowledge, then ask an open-ended question.
+2. IF PROSPECT ASKS A DIRECT QUESTION:
+   -> Tactic: ANSWER, THEN DEFLECT
+   -> Response: Give a brief 1-sentence answer, then immediately hand the mic back.
+3. IF PROSPECT SAYS "We are doing a website redesign":
+   -> Tactic: PIVOT TO TIMING
+   -> Response: "Perfect timing. It's actually much easier to build accessibility in *during* the redesign. Who is handling that?"
+4. IF PROSPECT SAYS "We already use a competitor":
+   -> Tactic: CONSULTATIVE GAP FINDING
+   -> Response: "Great platform. Most folks using them still struggle with deep PDF remediation. How are you handling your PDFs?"
+
+TONE AND VOICE GUARDRAILS (CRITICAL):
+1. Write exactly how human beings speak, not how they write.
+2. Use fragments. Start sentences with "So," "But," or "Look."
+3. NEVER use generic AI words like: "delve", "elevate", "navigate", "robust", "seamless", "synergy", or "ensure".
+4. Do not be overly enthusiastic. No exclamation points. Act calm, slightly detached, and authoritative.
+5. Bad Example: "I completely understand your concern! However, our platform offers a robust solution for that."
+6. Good Example: "Makes sense. But how are you guys actually handling the Title II stuff right now?"
+
+CRITICAL RULES FOR OUTPUT:
+1. The rep is reading your output LIVE on a teleprompter.
+2. The 'say_this' field MUST be conversational, direct, and STRICTLY UNDER 15 WORDS. Zero fluff.
+3. You must respond ONLY with this exact JSON structure:
+{
+  "stage": "Identify stage (e.g., Hook, Discovery, Objection)",
+  "tactic": "SHORT UPPERCASE ACTION (e.g., PEEL THE ONION)",
+  "say_this": "The exact sentence to read out loud",
+  "objection_label": "Short objection label if one was raised, otherwise null"
+}"""
+
+# ---------------------------------------------------------
+# HEALTH CHECK ENDPOINT
+# ---------------------------------------------------------
 @app.get("/")
 async def root():
     return {"status": "EqualGround AI Copilot Engine is Live and Running!"}
 
-
-# Initialize OpenAI client using os.environ.get
-api_key = os.environ.get("OPENAI_API_KEY")
-if not api_key:
-    print("WARNING: OPENAI_API_KEY not set. AI responses will be disabled.")
-else:
-    print(f"OpenAI API key loaded successfully (ends in ...{api_key[-4:]})")
-
-client = AsyncOpenAI(api_key=api_key) if api_key else None
-
-# ─────────────────────────────────────────────────────────────────
-# v4.1 Master Prompt — AI uses playbook as a guide, never verbatim
-# ─────────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """You are an elite, real-time sales copilot for 'YuJa EqualGround', a premier digital accessibility and WCAG governance platform.
-
-Your Ultimate Goal: Book a 45-minute demo (30 min walkthrough, 15 min Q&A).
-
-The Opening Hook:
-Guide the rep to start with the Title II compliance scan angle.
-
-Adaptive Objection Handling Playbook:
-Use the following strategies as your foundation. DO NOT output them word-for-word. Dynamically adapt the phrasing to match the exact context of the prospect's sentence, keeping it conversational, punchy, and natural.
-
-'We already have a platform': Acknowledge it, remove the pressure to buy today, and position the 30-minute demo as a way to see how EqualGround is more efficient/cheaper for when future compliance talks happen.
-
-'No budget': Agree that today isn't about budget. Pivot to the urgency of Title II/DOJ changes, and position the demo as giving them knowledge to keep in their 'back pocket' for when budget does open up.
-
-'In a website redesign': Frame the redesign as the perfect time to look at this. Highlight that building compliance in from day one is cheaper than fixing it later.
-
-CRITICAL OUTPUT RULES:
-- NEVER output paragraphs. You are feeding a teleprompter.
-- The 'say_this' field must be conversational, direct, and UNDER 15 WORDS.
-- The 'tactic' field must be exactly 2-4 words describing the move.
-- Respond ONLY with a strict JSON object — no markdown, no extra text.
-
-{
-  "stage": "Gatekeeper | Discovery | Problem Confirmation | Solution Positioning | Objection Handling | Closing",
-  "tactic": "2-4 word instruction (e.g. 'Pivot to Pain', 'Remove Pressure', 'Book the Demo')",
-  "say_this": "Under 15 words. Punchy. Conversational. What the rep reads out loud.",
-  "objection_label": "Short objection label if one was raised, otherwise null"
-}"""
-
-
-async def get_ai_response(current_stage: str, rep_message: str, prospect_response: str, call_history: list[dict] = []) -> dict:
-    """Get AI-generated guidance. All responses — including objections — go through OpenAI."""
-
-    if not client:
-        return {
-            "stage": "Gatekeeper",
-            "tactic": "Add API Key",
-            "say_this": "Set your OPENAI_API_KEY in .env.local to get live AI guidance.",
-            "objection_label": None,
-        }
-
-    try:
-        user_message = f"""Current Stage: {current_stage}
-Sales Rep's Last Message: {rep_message}
-Prospect's Response: {prospect_response}
-
-Generate the next coaching response for the rep."""
-
-        print(f"ATTEMPTING TO CALL OPENAI WITH TEXT: {prospect_response}")
-
-        # Sliding window: only send last 10 messages for context efficiency
-        recent_history = call_history[-10:] if len(call_history) > 10 else call_history
-        context_block = "\n".join(f"{m['speaker']}: {m['text']}" for m in recent_history)
-
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-        ]
-        if context_block:
-            messages.append({"role": "user", "content": f"Recent call context:\n{context_block}"})
-        messages.append({"role": "user", "content": user_message})
-
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=0.7,
-        )
-
-        response_text = response.choices[0].message.content.strip()
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
-            response_text = response_text.strip()
-
-        result = json.loads(response_text)
-        if "objection_label" not in result:
-            result["objection_label"] = None
-        print(f"AI response: stage={result.get('stage')} | tactic={result.get('tactic')} | objection={result.get('objection_label')}")
-        return result
-    except Exception as e:
-        print(f"ERROR calling OpenAI — type: {type(e).__name__} | detail: {e}")
-        return {
-            "stage": current_stage,
-            "tactic": "Recover",
-            "say_this": "Could you help me understand your role in digital accessibility?",
-            "objection_label": None,
-        }
-
-
-SUMMARY_PROMPT = """You are an executive sales assistant. Read the following sales call transcript and generate a concise CRM-ready summary with exactly three sections:
-
-1. **Pain Points Discovered** — What problems or challenges did the prospect mention?
-2. **Objections Raised** — What pushback or concerns did the prospect voice?
-3. **Recommended Next Steps** — Based on the conversation, what should the rep do next?
-
-Keep each section to 1-3 bullet points. Be specific, reference what the prospect actually said."""
-
-
-async def generate_summary(call_history: list[dict]) -> str:
-    """Send the full call transcript to OpenAI and get a CRM summary."""
-    if not client:
-        return "No OpenAI API key configured — unable to generate summary."
-
-    transcript_text = "\n".join(
-        f"{entry['speaker']}: {entry['text']}" for entry in call_history
-    )
-
-    try:
-        print(f"Generating post-call summary from {len(call_history)} messages...")
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SUMMARY_PROMPT},
-                {"role": "user", "content": transcript_text},
-            ],
-            temperature=0.5,
-        )
-        summary = response.choices[0].message.content.strip()
-        print("Post-call summary generated successfully.")
-        return summary
-    except Exception as e:
-        print(f"ERROR generating summary — type: {type(e).__name__} | detail: {e}")
-        return f"Error generating summary: {e}"
-
-
+# ---------------------------------------------------------
+# WEBSOCKET REAL-TIME ENGINE
+# ---------------------------------------------------------
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("Frontend UI Connected! Listening for real microphone data...")
-
-    # Initialize call state
+    call_history = []
     current_stage = "Gatekeeper"
-    current_script = "Hi! Who handles your website accessibility and WCAG compliance?"
-    call_history: list[dict] = []
+    current_script = "Hi. Who handles your website accessibility and WCAG compliance?"
+    print("Client connected to WebSocket")
 
     try:
         # Send initial stage guidance
@@ -173,44 +83,77 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             "objection_label": None,
         })
 
-        # Live loop — waits indefinitely for real microphone input from the frontend
         async for message in websocket.iter_text():
             data = json.loads(message)
 
+            # --- DUAL MODEL: SUMMARY PHASE (GPT-4o) ---
             if data.get("type") == "end_call":
-                print("End Call received — generating summary...")
-                summary_text = await generate_summary(call_history)
+                print("Generating post-call summary using gpt-4o...")
+
+                summary_prompt = "Based on this call history, generate a CRM-ready summary with 3 bullet points: Pain Points, Objections Raised, and Recommended Next Steps."
+                transcript_text = "\n".join(
+                    f"{entry['role']}: {entry['content']}" for entry in call_history
+                )
+                summary_messages = [
+                    {"role": "system", "content": summary_prompt},
+                    {"role": "user", "content": transcript_text},
+                ]
+
+                summary_response = await client.chat.completions.create(
+                    model="gpt-4o",  # The Heavyweight model for deep analysis
+                    messages=summary_messages
+                )
+
+                final_summary = summary_response.choices[0].message.content
+
                 await websocket.send_json({
                     "type": "summary",
-                    "text": summary_text,
+                    "text": final_summary,
                 })
                 break
 
+            # --- NORMAL LIVE CALL FLOW ---
             if data.get("type") == "transcript":
-                prospect_text = data.get("text", "").strip()
-                if not prospect_text:
+                user_text = data.get("text", "").strip()
+                if not user_text:
                     continue
-                print(f"Received from Microphone: {prospect_text}")
 
-                # Record to call history
-                call_history.append({"speaker": "Prospect", "text": prospect_text})
+                print(f"Received from Microphone: {user_text}")
 
-                # Send the spoken text back to the transcript panel
+                # Echo transcript back to the UI
                 await websocket.send_json({
                     "type": "transcript",
                     "speaker": "Prospect",
-                    "text": prospect_text,
+                    "text": user_text,
                 })
 
-                # Get AI guidance for this live input
-                guidance = await get_ai_response(current_stage, current_script, prospect_text, call_history)
+                # Log the prospect's speech
+                call_history.append({"role": "user", "content": user_text})
 
-                # Record the rep's suggested script to history too
-                call_history.append({"speaker": "Rep (AI Suggested)", "text": guidance["say_this"]})
+                # SLIDING WINDOW: Keep prompt + only the last 10 messages for speed
+                recent_context = call_history[-10:]
+                messages = [{"role": "system", "content": SYSTEM_PROMPT}] + recent_context
+
+                # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) ---
+                response = await client.chat.completions.create(
+                    model="gpt-4o-mini",  # The Lightweight model for split-second reflexes
+                    messages=messages,
+                    response_format={"type": "json_object"}  # Strict JSON Lock
+                )
+
+                ai_response_text = response.choices[0].message.content
+
+                # Log the AI's advice to the history
+                call_history.append({"role": "assistant", "content": ai_response_text})
+
+                # Parse the JSON response
+                guidance = json.loads(ai_response_text)
+                if "objection_label" not in guidance:
+                    guidance["objection_label"] = None
 
                 # Update running state
-                current_stage = guidance["stage"]
-                current_script = guidance["say_this"]
+                current_stage = guidance.get("stage", current_stage)
+                current_script = guidance.get("say_this", current_script)
 
                 # Push AI coaching back to the UI
                 await websocket.send_json({
@@ -221,5 +164,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     "objection_label": guidance.get("objection_label"),
                 })
 
+    except WebSocketDisconnect:
+        print("Client disconnected from WebSocket")
     except Exception as e:
-        print(f"Frontend UI Disconnected: {e}")
+        print(f"Error in WebSocket: {e}")
