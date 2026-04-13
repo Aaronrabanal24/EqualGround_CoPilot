@@ -39,6 +39,9 @@ Use the following strategies as your foundation. DO NOT output them word-for-wor
 'In a website redesign': Frame the redesign as the perfect time to look at this. Highlight that building compliance in from day one is cheaper than fixing it later.
 
 Respond ONLY with a strict JSON object — no markdown, no extra text:
+
+CRITICAL: Keep your 'next_script' under 20 words. The rep needs to read this while talking, so keep it punchy, conversational, and direct. No fluff.
+
 {
   "current_stage": "Stage X: [Gatekeeper | Discovery | Problem Confirmation | Solution Positioning | Objection Handling | Closing]",
   "objection_label": "Short label describing the objection if the prospect raised one, otherwise null",
