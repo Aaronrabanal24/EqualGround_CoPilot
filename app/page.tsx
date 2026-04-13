@@ -97,8 +97,8 @@ export default function Home() {
     }
 
     const SpeechRecognition =
-      (window as typeof window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
-      (window as typeof window & { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       alert("Your browser does not support speech recognition. Please use Chrome.");
@@ -111,14 +111,14 @@ export default function Home() {
     recognition.lang = "en-US";
     recognitionRef.current = recognition;
 
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       if (!transcript) return;
       console.log("Mic captured:", transcript);
       wsRef.current?.send(JSON.stringify({ type: "transcript", text: transcript }));
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error);
       setIsListening(false);
     };
