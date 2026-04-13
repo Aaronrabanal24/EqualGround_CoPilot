@@ -155,9 +155,25 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
                 final_summary = summary_response.choices[0].message.content
 
+                # --- FORMAT THE RAW TRANSCRIPT ---
+                formatted_transcript = "\n\n=======================\nFULL TRANSCRIPT\n=======================\n\n"
+                for entry in call_history:
+                    if entry["role"] == "user":
+                        formatted_transcript += f"PROSPECT: {entry['content']}\n\n"
+                    elif entry["role"] == "assistant":
+                        try:
+                            ai_dict = json.loads(entry["content"])
+                            say_this = ai_dict.get("say_this", "")
+                            tactic = ai_dict.get("tactic", "")
+                            formatted_transcript += f"COPILOT [{tactic}]: {say_this}\n\n"
+                        except json.JSONDecodeError:
+                            pass
+
+                combined_output = final_summary + formatted_transcript
+
                 await websocket.send_json({
                     "type": "summary",
-                    "text": final_summary,
+                    "text": combined_output,
                 })
                 break
 
