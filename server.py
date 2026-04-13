@@ -10,6 +10,12 @@ load_dotenv(dotenv_path=".env.local", override=True)
 
 app = FastAPI()
 
+
+@app.get("/")
+async def root():
+    return {"status": "EqualGround AI Copilot Engine is Live and Running!"}
+
+
 # Initialize OpenAI client using os.environ.get
 api_key = os.environ.get("OPENAI_API_KEY")
 if not api_key:
