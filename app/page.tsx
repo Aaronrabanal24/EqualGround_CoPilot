@@ -89,7 +89,7 @@ export default function Home() {
     };
   }, []);
 
-  function toggleMicrophone() {
+  async function toggleMicrophone() {
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -103,6 +103,19 @@ export default function Home() {
     if (!SpeechRecognition) {
       alert("Your browser does not support speech recognition. Please use Chrome.");
       return;
+    }
+
+    // Force Chrome to pass raw audio without echo cancellation (fixes Stereo Mix muting)
+    try {
+      await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+    } catch (err) {
+      console.warn("Could not acquire raw audio stream:", err);
     }
 
     const recognition = new SpeechRecognition();

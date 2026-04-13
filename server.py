@@ -123,12 +123,12 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     print("Client connected to WebSocket")
 
     try:
-        # Send initial stage guidance
+        # Send initial STATUS GUIDANCE instead of a template
         await websocket.send_json({
             "type": "navigation",
-            "stage": current_stage,
-            "tactic": "Open the Call",
-            "say_this": current_script,
+            "stage": "System Live",
+            "tactic": "AUDIO ROUTED",
+            "say_this": "🟢 AI Copilot is connected and listening for the prospect...",
             "objection_label": None,
         })
 
