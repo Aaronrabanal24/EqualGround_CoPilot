@@ -49,7 +49,10 @@ export default function Home() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws/ui");
+    const wsUrl = process.env.NODE_ENV === "production"
+      ? "wss://equalground-copilot.onrender.com/ws/ui"
+      : "ws://127.0.0.1:8000/ws/ui";
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
