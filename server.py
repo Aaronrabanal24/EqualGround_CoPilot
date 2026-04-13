@@ -5,15 +5,17 @@ import os
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
-# Load environment variables from .env.local
-load_dotenv(".env.local")
+# Explicitly load .env.local and override any existing env vars
+load_dotenv(dotenv_path=".env.local", override=True)
 
 app = FastAPI()
 
-# Initialize OpenAI client
-api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client using os.environ.get
+api_key = os.environ.get("OPENAI_API_KEY")
 if not api_key:
-    print("⚠️  WARNING: OPENAI_API_KEY not set. Using mock responses.")
+    print("WARNING: OPENAI_API_KEY not set. AI responses will be disabled.")
+else:
+    print(f"OpenAI API key loaded successfully (ends in ...{api_key[-4:]})")
 
 client = AsyncOpenAI(api_key=api_key) if api_key else None
 
@@ -65,6 +67,8 @@ Prospect's Response: {prospect_response}
 
 Generate the next coaching response for the rep."""
 
+        print(f"ATTEMPTING TO CALL OPENAI WITH TEXT: {prospect_response}")
+
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -87,7 +91,7 @@ Generate the next coaching response for the rep."""
         print(f"AI response for stage: {result.get('current_stage')} | objection: {result.get('objection_label')}")
         return result
     except Exception as e:
-        print(f"Error calling OpenAI: {e}")
+        print(f"ERROR calling OpenAI — type: {type(e).__name__} | detail: {e}")
         return {
             "current_stage": current_stage,
             "objection_label": None,
@@ -100,224 +104,54 @@ Generate the next coaching response for the rep."""
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("Frontend UI Connected!")
+    print("Frontend UI Connected! Listening for real microphone data...")
 
     # Initialize call state
     current_stage = "Stage 1: Gatekeeper"
-    call_history = []
+    current_script = "Hi there! I was hoping you could point me in the right direction. Who handles your website accessibility and WCAG compliance?"
 
     try:
-        # Send initial stage guidance (rep's opening)
-        initial_guidance = {
+        # Send initial stage guidance
+        await websocket.send_json({
             "type": "navigation",
             "current_stage": current_stage,
-            "next_script": "Hi there! I was hoping you could point me in the right direction. Who handles your website accessibility and WCAG compliance?",
-            "suggested_action": "Listen for who they suggest. If it's an admin, move to discovery. If it's not available, handle the gatekeeper response.",
-        }
-        await websocket.send_json(initial_guidance)
-        print(
-            f"Sent initial navigation: {current_stage}"
-        )
+            "objection_label": None,
+            "next_script": current_script,
+            "suggested_action": "Wait for the prospect to answer, then listen closely for who they name."
+        })
 
-        # Simulate a realistic prospect response with delay
-        await asyncio.sleep(4)
-        prospect_response_1 = "That would be John, but he's busy right now. Can you call back later?"
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_1,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_1}
-        )
+        # Live loop — waits indefinitely for real microphone input from the frontend
+        async for message in websocket.iter_text():
+            data = json.loads(message)
 
-        # Get AI guidance based on prospect response
-        initial_script = initial_guidance["next_script"]
-        guidance_1 = await get_ai_response(
-            current_stage,
-            initial_script,
-            prospect_response_1,
-        )
-        current_stage = guidance_1["current_stage"]
+            if data.get("type") == "transcript":
+                prospect_text = data.get("text", "").strip()
+                if not prospect_text:
+                    continue
+                print(f"Received from Microphone: {prospect_text}")
 
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_1["current_stage"],
-                "objection_label": guidance_1.get("objection_label"),
-                "next_script": guidance_1["next_script"],
-                "suggested_action": guidance_1["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
+                # Send the spoken text back to the transcript panel
+                await websocket.send_json({
+                    "type": "transcript",
+                    "speaker": "Prospect",
+                    "text": prospect_text,
+                })
 
-        # Second exchange: Rep responds to gatekeeper objection
-        await asyncio.sleep(4)
-        prospect_response_2 = "I mean, it could be important. What is this about exactly?"
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_2,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_2}
-        )
+                # Get AI guidance for this live input
+                guidance = await get_ai_response(current_stage, current_script, prospect_text)
 
-        guidance_2 = await get_ai_response(
-            current_stage,
-            guidance_1["next_script"],
-            prospect_response_2,
-        )
-        current_stage = guidance_2["current_stage"]
+                # Update running state
+                current_stage = guidance["current_stage"]
+                current_script = guidance["next_script"]
 
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_2["current_stage"],
-                "objection_label": guidance_2.get("objection_label"),
-                "next_script": guidance_2["next_script"],
-                "suggested_action": guidance_2["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
-
-        # Third exchange: Prospect continues
-        await asyncio.sleep(4)
-        prospect_response_3 = "We're actually facing WCAG compliance issues right now."
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_3,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_3}
-        )
-
-        guidance_3 = await get_ai_response(
-            current_stage,
-            guidance_2["next_script"],
-            prospect_response_3,
-        )
-        current_stage = guidance_3["current_stage"]
-
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_3["current_stage"],
-                "objection_label": guidance_3.get("objection_label"),
-                "next_script": guidance_3["next_script"],
-                "suggested_action": guidance_3["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
-
-        # Fourth exchange: "We already have a platform" objection
-        await asyncio.sleep(5)
-        prospect_response_4 = "I appreciate that, but we already have a platform we use for this."
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_4,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_4}
-        )
-
-        guidance_4 = await get_ai_response(
-            current_stage,
-            guidance_3["next_script"],
-            prospect_response_4,
-        )
-        current_stage = guidance_4["current_stage"]
-
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_4["current_stage"],
-                "objection_label": guidance_4.get("objection_label"),
-                "next_script": guidance_4["next_script"],
-                "suggested_action": guidance_4["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
-
-        # Fifth exchange: "We don't have the budget" objection
-        await asyncio.sleep(5)
-        prospect_response_5 = "Even if I wanted to, we don't have the budget for anything new right now."
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_5,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_5}
-        )
-
-        guidance_5 = await get_ai_response(
-            current_stage,
-            guidance_4["next_script"],
-            prospect_response_5,
-        )
-        current_stage = guidance_5["current_stage"]
-
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_5["current_stage"],
-                "objection_label": guidance_5.get("objection_label"),
-                "next_script": guidance_5["next_script"],
-                "suggested_action": guidance_5["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
-
-        # Sixth exchange: "Website redesign" objection
-        await asyncio.sleep(5)
-        prospect_response_6 = "Plus, we're already in the middle of a full website redesign right now."
-        await websocket.send_json(
-            {
-                "type": "transcript",
-                "speaker": "Prospect",
-                "text": prospect_response_6,
-            }
-        )
-        call_history.append(
-            {"speaker": "Prospect", "text": prospect_response_6}
-        )
-
-        guidance_6 = await get_ai_response(
-            current_stage,
-            guidance_5["next_script"],
-            prospect_response_6,
-        )
-        current_stage = guidance_6["current_stage"]
-
-        await asyncio.sleep(1)
-        await websocket.send_json(
-            {
-                "type": "navigation",
-                "current_stage": guidance_6["current_stage"],
-                "objection_label": guidance_6.get("objection_label"),
-                "next_script": guidance_6["next_script"],
-                "suggested_action": guidance_6["suggested_action"],
-            }
-        )
-        print(f"Sent navigation update: {current_stage}")
+                # Push AI coaching back to the UI
+                await websocket.send_json({
+                    "type": "navigation",
+                    "current_stage": guidance["current_stage"],
+                    "objection_label": guidance.get("objection_label"),
+                    "next_script": guidance["next_script"],
+                    "suggested_action": guidance["suggested_action"],
+                })
 
     except Exception as e:
         print(f"Frontend UI Disconnected: {e}")

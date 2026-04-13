@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type Transcript = {
   speaker: string;
@@ -38,12 +38,17 @@ export default function Home() {
     next_script: "Waiting for call guidance...",
     suggested_action: "Stand by...",
   });
+  const [isListening, setIsListening] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket("ws://127.0.0.1:8000/ws/ui");
+    wsRef.current = ws;
 
     ws.onopen = () => {
-      setTranscripts([{ speaker: "System", text: "🟢 Connected! AI GPS Ready." }]);
+      setTranscripts([{ speaker: "System", text: "🟢 Connected! AI GPS Ready. Click 'Start Microphone' to begin." }]);
     };
 
     ws.onmessage = (event) => {
@@ -68,8 +73,53 @@ export default function Home() {
       ]);
     };
 
-    return () => ws.close();
+    return () => {
+      ws.close();
+      recognitionRef.current?.stop();
+    };
   }, []);
+
+  function toggleMicrophone() {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as typeof window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
+      (window as typeof window & { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Your browser does not support speech recognition. Please use Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      if (!transcript) return;
+      console.log("Mic captured:", transcript);
+      wsRef.current?.send(JSON.stringify({ type: "transcript", text: transcript }));
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+    setIsListening(true);
+  }
 
   return (
     <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans">
@@ -95,6 +145,18 @@ export default function Home() {
             </p>
           ))}
         </div>
+
+        {/* Microphone Button */}
+        <button
+          onClick={toggleMicrophone}
+          className={`mt-6 w-full rounded-lg py-4 text-lg font-bold uppercase tracking-wider transition-all ${
+            isListening
+              ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+              : "bg-green-600 hover:bg-green-700 text-white"
+          }`}
+        >
+          {isListening ? "🔴 Stop Microphone" : "🎤 Start Microphone"}
+        </button>
       </div>
 
       {/* RIGHT SIDE: Call Navigator (GPS Teleprompter) */}
