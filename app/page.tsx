@@ -8,10 +8,10 @@ type Transcript = {
 };
 
 type Navigation = {
-  current_stage: string;
+  stage: string;
+  tactic: string;
+  say_this: string;
   objection_label: string | null;
-  next_script: string;
-  suggested_action: string;
 };
 
 type IncomingMessage =
@@ -22,10 +22,10 @@ type IncomingMessage =
     }
   | {
       type: "navigation";
-      current_stage: string;
+      stage: string;
+      tactic: string;
+      say_this: string;
       objection_label: string | null;
-      next_script: string;
-      suggested_action: string;
     }
   | {
       type: "summary";
@@ -37,10 +37,10 @@ export default function Home() {
     { speaker: "System", text: "Connecting to AI Call GPS..." },
   ]);
   const [navigation, setNavigation] = useState<Navigation>({
-    current_stage: "Initializing...",
+    stage: "Initializing...",
+    tactic: "",
+    say_this: "Waiting for call guidance...",
     objection_label: null,
-    next_script: "Waiting for call guidance...",
-    suggested_action: "Stand by...",
   });
   const [isListening, setIsListening] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
@@ -66,10 +66,10 @@ export default function Home() {
         setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text }]);
       } else if (data.type === "navigation") {
         setNavigation({
-          current_stage: data.current_stage,
+          stage: data.stage,
+          tactic: data.tactic,
+          say_this: data.say_this,
           objection_label: data.objection_label ?? null,
-          next_script: data.next_script,
-          suggested_action: data.suggested_action,
         });
       } else if (data.type === "summary") {
         setSummary(data.text);
@@ -213,45 +213,38 @@ export default function Home() {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Call Navigator (GPS Teleprompter) */}
-      <div className="w-2/5 bg-slate-950 p-8 flex flex-col justify-between">
-        {/* Stage Indicator */}
-        <div className="space-y-3">
-          <div
-            className={`inline-block rounded-full px-4 py-2 text-sm font-bold uppercase tracking-widest text-white ${
-              navigation.current_stage === "Stage 5: Objection Handling"
+      {/* RIGHT SIDE: Call Guide (Teleprompter) */}
+      <div className="w-2/5 bg-slate-950 p-8 flex flex-col">
+        {/* Stage Pill — top right */}
+        <div className="flex items-center justify-end gap-3">
+          {navigation.objection_label && (
+            <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white animate-pulse">
+              {navigation.objection_label}
+            </span>
+          )}
+          <span
+            className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white ${
+              navigation.stage.toLowerCase().includes("objection")
                 ? "bg-red-600"
                 : "bg-amber-600"
             }`}
           >
-            {navigation.current_stage}
-          </div>
-          {navigation.objection_label && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-500 bg-red-950 px-4 py-3">
-              <span className="text-lg">🚨</span>
-              <span className="text-sm font-bold text-red-300">{navigation.objection_label}</span>
-            </div>
-          )}
+            {navigation.stage}
+          </span>
         </div>
 
-        {/* Main Script (Teleprompter) */}
-        <div className="flex-1 flex flex-col justify-center">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-400">
-            📺 READ THIS (Teleprompter):
-          </h2>
-          <div className="rounded-lg border-2 border-green-500 bg-slate-900 p-8 shadow-lg">
-            <p className="text-4xl font-bold leading-relaxed text-green-300">
-              {navigation.next_script}
-            </p>
-          </div>
+        {/* Tactic Header */}
+        <div className="mt-8">
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-400">
+            {navigation.tactic}
+          </p>
         </div>
 
-        {/* Tactical Action */}
-        <div className="mt-8 rounded-lg border border-blue-500 bg-slate-800 p-6">
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-400">
-            💡 Tactical Action:
-          </h3>
-          <p className="text-sm text-blue-200">{navigation.suggested_action}</p>
+        {/* SAY THIS — Giant Teleprompter */}
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-center text-4xl font-bold leading-snug text-green-300">
+            {navigation.say_this}
+          </p>
         </div>
       </div>
     </div>

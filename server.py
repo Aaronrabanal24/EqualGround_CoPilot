@@ -38,29 +38,29 @@ Use the following strategies as your foundation. DO NOT output them word-for-wor
 
 'In a website redesign': Frame the redesign as the perfect time to look at this. Highlight that building compliance in from day one is cheaper than fixing it later.
 
-Respond ONLY with a strict JSON object — no markdown, no extra text:
-
-CRITICAL: Keep your 'next_script' under 20 words. The rep needs to read this while talking, so keep it punchy, conversational, and direct. No fluff.
+CRITICAL OUTPUT RULES:
+- NEVER output paragraphs. You are feeding a teleprompter.
+- The 'say_this' field must be conversational, direct, and UNDER 15 WORDS.
+- The 'tactic' field must be exactly 2-4 words describing the move.
+- Respond ONLY with a strict JSON object — no markdown, no extra text.
 
 {
-  "current_stage": "Stage X: [Gatekeeper | Discovery | Problem Confirmation | Solution Positioning | Objection Handling | Closing]",
-  "objection_label": "Short label describing the objection if the prospect raised one, otherwise null",
-  "prospect_intent": "One sentence describing what the prospect really means",
-  "next_script": "Adaptive, natural, conversational response for the rep to say next",
-  "suggested_action": "One tactical action tip for the rep"
+  "stage": "Gatekeeper | Discovery | Problem Confirmation | Solution Positioning | Objection Handling | Closing",
+  "tactic": "2-4 word instruction (e.g. 'Pivot to Pain', 'Remove Pressure', 'Book the Demo')",
+  "say_this": "Under 15 words. Punchy. Conversational. What the rep reads out loud.",
+  "objection_label": "Short objection label if one was raised, otherwise null"
 }"""
 
 
-async def get_ai_response(current_stage: str, rep_message: str, prospect_response: str) -> dict:
+async def get_ai_response(current_stage: str, rep_message: str, prospect_response: str, call_history: list[dict] = []) -> dict:
     """Get AI-generated guidance. All responses — including objections — go through OpenAI."""
 
     if not client:
         return {
-            "current_stage": "Stage 1: Gatekeeper",
+            "stage": "Gatekeeper",
+            "tactic": "Add API Key",
+            "say_this": "Set your OPENAI_API_KEY in .env.local to get live AI guidance.",
             "objection_label": None,
-            "prospect_intent": "No API key configured",
-            "next_script": "Set your OPENAI_API_KEY in .env.local to get live AI guidance.",
-            "suggested_action": "Add a valid OpenAI API key to .env.local and restart the backend.",
         }
 
     try:
@@ -72,12 +72,20 @@ Generate the next coaching response for the rep."""
 
         print(f"ATTEMPTING TO CALL OPENAI WITH TEXT: {prospect_response}")
 
+        # Sliding window: only send last 10 messages for context efficiency
+        recent_history = call_history[-10:] if len(call_history) > 10 else call_history
+        context_block = "\n".join(f"{m['speaker']}: {m['text']}" for m in recent_history)
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+        ]
+        if context_block:
+            messages.append({"role": "user", "content": f"Recent call context:\n{context_block}"})
+        messages.append({"role": "user", "content": user_message})
+
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
+            messages=messages,
             temperature=0.7,
         )
 
@@ -91,16 +99,15 @@ Generate the next coaching response for the rep."""
         result = json.loads(response_text)
         if "objection_label" not in result:
             result["objection_label"] = None
-        print(f"AI response for stage: {result.get('current_stage')} | objection: {result.get('objection_label')}")
+        print(f"AI response: stage={result.get('stage')} | tactic={result.get('tactic')} | objection={result.get('objection_label')}")
         return result
     except Exception as e:
         print(f"ERROR calling OpenAI — type: {type(e).__name__} | detail: {e}")
         return {
-            "current_stage": current_stage,
+            "stage": current_stage,
+            "tactic": "Recover",
+            "say_this": "Could you help me understand your role in digital accessibility?",
             "objection_label": None,
-            "prospect_intent": "Error occurred",
-            "next_script": "I apologize, let me refocus. Could you help me understand your role in digital accessibility?",
-            "suggested_action": "Restart the discovery conversation.",
         }
 
 
@@ -146,18 +153,18 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     print("Frontend UI Connected! Listening for real microphone data...")
 
     # Initialize call state
-    current_stage = "Stage 1: Gatekeeper"
-    current_script = "Hi there! I was hoping you could point me in the right direction. Who handles your website accessibility and WCAG compliance?"
+    current_stage = "Gatekeeper"
+    current_script = "Hi! Who handles your website accessibility and WCAG compliance?"
     call_history: list[dict] = []
 
     try:
         # Send initial stage guidance
         await websocket.send_json({
             "type": "navigation",
-            "current_stage": current_stage,
+            "stage": current_stage,
+            "tactic": "Open the Call",
+            "say_this": current_script,
             "objection_label": None,
-            "next_script": current_script,
-            "suggested_action": "Wait for the prospect to answer, then listen closely for who they name."
         })
 
         # Live loop — waits indefinitely for real microphone input from the frontend
@@ -190,22 +197,22 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                 })
 
                 # Get AI guidance for this live input
-                guidance = await get_ai_response(current_stage, current_script, prospect_text)
+                guidance = await get_ai_response(current_stage, current_script, prospect_text, call_history)
 
                 # Record the rep's suggested script to history too
-                call_history.append({"speaker": "Rep (AI Suggested)", "text": guidance["next_script"]})
+                call_history.append({"speaker": "Rep (AI Suggested)", "text": guidance["say_this"]})
 
                 # Update running state
-                current_stage = guidance["current_stage"]
-                current_script = guidance["next_script"]
+                current_stage = guidance["stage"]
+                current_script = guidance["say_this"]
 
                 # Push AI coaching back to the UI
                 await websocket.send_json({
                     "type": "navigation",
-                    "current_stage": guidance["current_stage"],
+                    "stage": guidance["stage"],
+                    "tactic": guidance.get("tactic", ""),
+                    "say_this": guidance["say_this"],
                     "objection_label": guidance.get("objection_label"),
-                    "next_script": guidance["next_script"],
-                    "suggested_action": guidance["suggested_action"],
                 })
 
     except Exception as e:
