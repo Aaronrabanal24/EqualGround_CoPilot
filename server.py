@@ -101,6 +101,42 @@ Generate the next coaching response for the rep."""
         }
 
 
+SUMMARY_PROMPT = """You are an executive sales assistant. Read the following sales call transcript and generate a concise CRM-ready summary with exactly three sections:
+
+1. **Pain Points Discovered** — What problems or challenges did the prospect mention?
+2. **Objections Raised** — What pushback or concerns did the prospect voice?
+3. **Recommended Next Steps** — Based on the conversation, what should the rep do next?
+
+Keep each section to 1-3 bullet points. Be specific, reference what the prospect actually said."""
+
+
+async def generate_summary(call_history: list[dict]) -> str:
+    """Send the full call transcript to OpenAI and get a CRM summary."""
+    if not client:
+        return "No OpenAI API key configured — unable to generate summary."
+
+    transcript_text = "\n".join(
+        f"{entry['speaker']}: {entry['text']}" for entry in call_history
+    )
+
+    try:
+        print(f"Generating post-call summary from {len(call_history)} messages...")
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SUMMARY_PROMPT},
+                {"role": "user", "content": transcript_text},
+            ],
+            temperature=0.5,
+        )
+        summary = response.choices[0].message.content.strip()
+        print("Post-call summary generated successfully.")
+        return summary
+    except Exception as e:
+        print(f"ERROR generating summary — type: {type(e).__name__} | detail: {e}")
+        return f"Error generating summary: {e}"
+
+
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -109,6 +145,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     # Initialize call state
     current_stage = "Stage 1: Gatekeeper"
     current_script = "Hi there! I was hoping you could point me in the right direction. Who handles your website accessibility and WCAG compliance?"
+    call_history: list[dict] = []
 
     try:
         # Send initial stage guidance
@@ -124,11 +161,23 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         async for message in websocket.iter_text():
             data = json.loads(message)
 
+            if data.get("type") == "end_call":
+                print("End Call received — generating summary...")
+                summary_text = await generate_summary(call_history)
+                await websocket.send_json({
+                    "type": "summary",
+                    "text": summary_text,
+                })
+                break
+
             if data.get("type") == "transcript":
                 prospect_text = data.get("text", "").strip()
                 if not prospect_text:
                     continue
                 print(f"Received from Microphone: {prospect_text}")
+
+                # Record to call history
+                call_history.append({"speaker": "Prospect", "text": prospect_text})
 
                 # Send the spoken text back to the transcript panel
                 await websocket.send_json({
@@ -139,6 +188,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
                 # Get AI guidance for this live input
                 guidance = await get_ai_response(current_stage, current_script, prospect_text)
+
+                # Record the rep's suggested script to history too
+                call_history.append({"speaker": "Rep (AI Suggested)", "text": guidance["next_script"]})
 
                 # Update running state
                 current_stage = guidance["current_stage"]
