@@ -46,7 +46,7 @@ export default function Home() {
   const [summary, setSummary] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const wsUrl = process.env.NODE_ENV === "production"
