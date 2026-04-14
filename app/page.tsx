@@ -537,31 +537,40 @@ export default function Home() {
 
         {/* Stage Progress Header */}
         <div className="px-6 py-4 border-b border-gray-800/60">
-          {/* Stage step indicators */}
+          {/* Stage step indicators — clickable */}
           <div className="flex gap-1 mb-3">
             {STAGE_LABELS.map((label, i) => {
               const step = i + 1;
               const isActive = step === currentStageNum;
               const isDone = step < currentStageNum;
+              const stageIds = ["GATEKEEPER", "INTRO", "CREDIBILITY", "DISCOVERY", "PITCH", "CTA"];
               return (
-                <div key={label} className="flex-1 flex flex-col items-center gap-1.5">
+                <button
+                  key={label}
+                  onClick={() => {
+                    if (wsRef.current?.readyState === WebSocket.OPEN) {
+                      wsRef.current.send(JSON.stringify({ type: "set_stage", stage: stageIds[i] }));
+                    }
+                  }}
+                  className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer"
+                >
                   <div
                     className={`h-1 w-full rounded-full transition-all duration-500 ${
                       isDone
-                        ? "bg-emerald-500"
+                        ? "bg-emerald-500 group-hover:bg-emerald-400"
                         : isActive
                           ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
-                          : "bg-gray-800"
+                          : "bg-gray-800 group-hover:bg-gray-600"
                     }`}
                   />
                   <span
                     className={`text-[9px] font-semibold uppercase tracking-wider transition-colors ${
-                      isDone ? "text-emerald-500" : isActive ? "text-blue-400" : "text-gray-600"
+                      isDone ? "text-emerald-500" : isActive ? "text-blue-400" : "text-gray-600 group-hover:text-gray-400"
                     }`}
                   >
                     {label}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

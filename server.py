@@ -586,6 +586,25 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     audio_mode = data.get("mode", "mono")
                     print(f"Audio mode set to: {audio_mode}")
 
+                elif data.get("type") == "set_stage":
+                    requested = data.get("stage", "")
+                    if requested in STAGE_ORDER:
+                        current_stage = requested
+                        stage_idx = STAGE_ORDER.index(current_stage) + 1
+                        stage_info = STAGES_BY_ID[current_stage]
+                        print(f"User manually set stage to: {current_stage}")
+                        await websocket.send_json({
+                            "type": "navigation",
+                            "stage": current_stage,
+                            "tactic": "STAGE CHANGE",
+                            "prospect_signal": f"Stage manually set to {stage_info['name']}",
+                            "insight": stage_info["goal"],
+                            "talking_points": [stage_info["instructions"][:80]],
+                            "objection_label": None,
+                            "next_milestone": stage_info["goal"],
+                            "stage_progress": f"{stage_idx}/6",
+                        })
+
                 elif data.get("type") == "end_call":
                     await _generate_summary()
                     break
