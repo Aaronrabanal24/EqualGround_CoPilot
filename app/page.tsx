@@ -97,13 +97,15 @@ export default function Home() {
 
   useEffect(() => {
     let wsUrl: string;
-    if (process.env.NODE_ENV === "production") {
-      wsUrl = "wss://equalground-copilot.onrender.com/ws/ui";
+    const token = process.env.NEXT_PUBLIC_COPILOT_API_KEY || "";
+
+    if (process.env.NEXT_PUBLIC_WS_URL) {
+      wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/ws/ui?token=${encodeURIComponent(token)}`;
     } else if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
       const host = window.location.hostname.replace(/-\d+\./, "-8000.");
-      wsUrl = `wss://${host}/ws/ui`;
+      wsUrl = `wss://${host}/ws/ui?token=${encodeURIComponent(token)}`;
     } else {
-      wsUrl = "ws://127.0.0.1:8000/ws/ui";
+      wsUrl = `ws://127.0.0.1:8000/ws/ui?token=${encodeURIComponent(token)}`;
     }
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

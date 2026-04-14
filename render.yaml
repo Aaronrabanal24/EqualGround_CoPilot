@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: equalground-copilot
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: COPILOT_API_KEY
+        sync: false

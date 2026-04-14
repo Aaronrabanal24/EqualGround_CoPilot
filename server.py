@@ -3,11 +3,12 @@ import json
 import asyncio
 from pathlib import Path
 from urllib.parse import urlencode
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
 from starlette.websockets import WebSocketState
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import websockets as ws_client
+import hmac
 
 # Load environment variables
 load_dotenv(dotenv_path=".env.local", override=True)
@@ -16,6 +17,7 @@ app = FastAPI()
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
+COPILOT_API_KEY = os.getenv("COPILOT_API_KEY", "")
 
 # ---------------------------------------------------------
 # LOAD KNOWLEDGE BASE FROM FILES
@@ -244,6 +246,13 @@ async def root():
 # ---------------------------------------------------------
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
+    # --- API Key Handshake ---
+    token = websocket.query_params.get("token", "")
+    if not COPILOT_API_KEY or not hmac.compare_digest(token, COPILOT_API_KEY):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        print("Rejected WebSocket: invalid or missing API key")
+        return
+
     await websocket.accept()
     call_history: list[dict] = []
     current_stage = "GATEKEEPER"
