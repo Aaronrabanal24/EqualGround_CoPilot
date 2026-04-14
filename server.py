@@ -154,9 +154,10 @@ EXAMPLE RESPONSES:"""
 
 ===== OBJECTION DETECTED =====
 TACTIC: {objection['tactic']}
+CONTEXT: {objection.get('context', '')}
 INSTRUCTIONS: {objection['instructions']}
-EXAMPLE RESPONSES:"""
-        for resp in objection["example_responses"][:2]:
+EXAMPLE RESPONSES (use these as inspiration for talking points):"""
+        for resp in objection["example_responses"][:3]:
             context_modules += f'\n  - "{resp}"'
 
     # Persona info — only if persona detected

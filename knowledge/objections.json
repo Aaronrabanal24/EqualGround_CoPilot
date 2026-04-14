@@ -2,72 +2,79 @@
   "objections": {
     "no_budget": {
       "trigger_phrases": ["no budget", "not in the budget", "can't afford", "cant afford", "budget is tight", "no money", "budget cycle", "already spent our budget", "not a priority right now", "don't have budget", "do not have budget", "don't have the budget", "no funding", "not funded", "budget doesn't allow", "don't have any budget", "have any budget", "afford"],
-      "tactic": "REMOVE PRESSURE",
-      "instructions": "Agree that today is not about budget. Pivot to Title II urgency. Position the demo as knowledge-gathering for when budget opens. Emphasize the cost of a lawsuit is 10-100x the cost of a solution.",
+      "tactic": "REFRAME THE CONVERSATION",
+      "instructions": "Immediately agree — never push against budget. Reframe: the purpose of this call isn't about budget, it's about showing them how EqualGround helps them stay compliant with Title II and DOJ changes. Position the demo as getting information into their back pocket for when budget conversations happen internally. The cost of non-compliance (DOJ lawsuits, loss of federal funding) far exceeds the cost of any solution.",
+      "context": "Title II compliance deadlines are approaching. DOJ has already begun investigations. A single complaint costs more to defend than a year of tooling. Budget objections are really timing objections — they need the information now even if the purchase comes later.",
       "example_responses": [
-        "Totally fair. This wouldn't be a budget conversation — more just getting you up to speed on what's out there before the deadline hits. Even 20 minutes.",
-        "Makes sense. But just to put it in perspective — a single DOJ complaint costs more to defend than a year of compliance tooling. Might be worth at least seeing what's out there.",
-        "Understood. When does your next budget cycle open? Might make sense to at least have a conversation now so you're ready when it does."
+        "I totally get that. But the purpose of this conversation isn't to talk about budget. My role is to show you how EqualGround helps you stay compliant with the upcoming Title II and DOJ changes. That way, when budget conversations do happen, you'll already have this in your back pocket. Would you be open to a quick 30-minute walkthrough?",
+        "Makes sense. Just to give you context — a single DOJ accessibility complaint costs more to resolve than an entire year of compliance tooling. Might be worth having the information ready so you can make the case internally when the time is right.",
+        "Understood. When does your next budget cycle open? A lot of IT directors use our demo as ammunition to justify the line item. Even 20 minutes gives you enough to bring to leadership."
       ]
     },
     "already_compliant": {
-      "trigger_phrases": ["we're already compliant", "we already handle that", "we're good", "we passed our audit", "we're covered"],
+      "trigger_phrases": ["we're already compliant", "we already handle that", "we're good", "we passed our audit", "we're covered", "already have a solution", "already have something in place"],
       "tactic": "CONSULTATIVE GAP FINDING",
-      "instructions": "Don't argue. Acknowledge. Then probe for PDFs specifically — that's almost always the gap. Ask about their document library, not just the web pages.",
+      "instructions": "Don't argue or contradict them. Acknowledge their effort. Then probe for the gap that almost always exists: PDFs and documents. Most institutions handle web pages but miss the document library (board minutes, agendas, reports, posted PDFs). Also probe: are they scanning against WCAG 2.1 AA specifically (the Title II standard), or an older standard? Are they covering subdomains and third-party embedded content?",
+      "context": "95% of institutions that say they're compliant have a massive PDF gap. Web overlays and basic scanning tools don't remediate documents. Title II specifically requires document accessibility. This is EqualGround's strongest differentiator.",
       "example_responses": [
-        "That's great. Are you covering the document side too — PDFs, board minutes, agendas? That's usually where we see the gap.",
-        "Good to hear. When was the last time you ran a full scan against WCAG 2.1 AA? The Title II updates added some new requirements.",
-        "Nice. Is your compliance covering just the main site, or are you scanning subdomains and third-party apps too?"
+        "That's great to hear. One thing I'd ask — are you covering the document side too? PDFs, board minutes, public agendas? That's typically where we see the biggest gap, even for institutions that have the web side buttoned up.",
+        "Good to hear. When was the last time you ran a full scan against WCAG 2.1 AA specifically? The Title II updates added requirements that a lot of older audits didn't cover.",
+        "Nice. Is your compliance covering just the main site, or does it extend to subdomains, embedded apps, and posted documents? The DOJ has been specifically going after unscanned PDF libraries."
       ]
     },
     "website_redesign": {
-      "trigger_phrases": ["redesign", "new website", "rebuilding", "migration", "launching a new site", "switching platforms", "redesigning"],
-      "tactic": "PIVOT TO TIMING",
-      "instructions": "Frame this as perfect timing. It's much easier and cheaper to build accessibility in during a redesign than to retrofit later. Ask who is handling the redesign.",
+      "trigger_phrases": ["redesign", "new website", "rebuilding", "migration", "launching a new site", "switching platforms", "redesigning", "revamping", "overhaul"],
+      "tactic": "PERFECT TIMING PIVOT",
+      "instructions": "Frame the redesign as the ideal moment to adopt EqualGround. Building accessibility into a redesign from day one is dramatically cheaper than retrofitting after launch. Most institutions that wait until after launch spend 3-5x more fixing issues that could have been prevented. Ask who's handling the redesign and whether accessibility is baked into the scope. Position EqualGround as the layer that ensures the new site launches compliant.",
+      "context": "Redesigns are the #1 opportunity for EqualGround adoption. The new site will need to meet Title II from day one. If they launch non-compliant, they'll face immediate exposure. Retrofitting accessibility after a redesign is expensive and frustrating. Many vendors building new sites don't include deep accessibility or PDF remediation in scope.",
       "example_responses": [
-        "Perfect timing actually. It's way easier to build accessibility in during the redesign than to bolt it on after. Who's handling the build?",
-        "That's actually ideal. A lot of our customers time EqualGround with their redesign so the new site launches fully compliant from day one. Who's the vendor?",
-        "Smart. So the question is — is the new site being built to Title II standards, or are you planning to address that separately?"
+        "Actually, that makes this the perfect time. Most institutions use EqualGround during a redesign to build toward compliance from day one, rather than trying to fix issues afterward — which ends up being way more expensive. Would it make sense to jump on a brief Zoom call to show you how to avoid those accessibility surprises once your new site goes live?",
+        "That's actually ideal timing. The question is whether the vendor building your new site is building it to Title II specifications. If not, you'd launch and immediately be out of compliance. EqualGround sits on top and catches whatever they miss.",
+        "Smart move. A lot of our customers time EqualGround with their redesign so the new site launches fully compliant from day one. Who's handling the build — are they including accessibility in the SOW?"
       ]
     },
     "using_competitor": {
-      "trigger_phrases": ["we already use", "we have a tool", "we're using", "we went with", "we signed with"],
-      "tactic": "CONSULTATIVE GAP FINDING",
-      "instructions": "Don't bash the competitor directly. Ask how it's working for them. Probe for gaps — especially PDFs, automation, and whether the tool flags vs. fixes. Use the relevant battlecard from battlecards.json.",
+      "trigger_phrases": ["we already use", "we have a tool", "we're using", "we went with", "we signed with", "already have a platform", "already have a vendor", "have a solution", "we have something"],
+      "tactic": "RESPECT AND DIFFERENTIATE",
+      "instructions": "Never bash the competitor directly. Acknowledge their investment. Then reframe: the demo isn't about replacing what they have, it's about showing how EqualGround works within their existing workflow. Key differentiators to surface: source-code-level remediation (not overlays), deep PDF/document remediation, Autopilot automation, and often lower cost. Position the demo as a comparison point — they should know what else is out there.",
+      "context": "Most competitors are either overlays (AudioEye, UserWay, accessiBe) that don't fix source code and the DOJ has said don't guarantee compliance, or scanning-only tools (Siteimprove, Monsido) that flag issues but don't fix them. EqualGround does both: scans AND remediates at the source code level, plus handles PDFs which almost no competitor does well.",
       "example_responses": [
-        "Got it. How's it been working for you? Is it catching everything, or are there areas where you're still doing manual work?",
-        "OK. And does it handle your PDFs and documents too, or mainly just the web pages?",
-        "When you say you're using it — is it scanning and flagging, or is it actually remediating the issues for you?"
+        "I completely understand. The nice part is, I'm not asking you to make any decisions right now. These demos are simply to show how EqualGround works more efficiently within your existing workflow, often at a fraction of the cost. Does it make sense to find a 30-minute slot just to have that information for when compliance discussions come up?",
+        "Got it. How's it been working for you — is it catching everything, or are there areas where you're still doing manual fixes? The reason I ask is most tools scan and flag, but EqualGround actually remediates the issues automatically, including PDFs.",
+        "Good to know. A lot of institutions use multiple tools. The question is whether your current platform handles document remediation and source-code fixes, or mainly just web scanning. Would it be worth 20 minutes to see the difference?"
       ]
     },
     "send_email": {
-      "trigger_phrases": ["send me an email", "email me", "send me info", "send me something", "put it in an email"],
+      "trigger_phrases": ["send me an email", "email me", "send me info", "send me something", "put it in an email", "send over some information"],
       "tactic": "AGREE AND ANCHOR",
-      "instructions": "Always agree to send an email. But before hanging up, anchor a follow-up: offer to include the scan results and ask for a specific follow-up time.",
+      "instructions": "Always agree to send the email — never resist. But immediately pivot: EqualGround really clicks once you see it in action, which is why most IT leaders prefer a brief walkthrough over reading a PDF. Offer to include the scan results from their actual site to make the email valuable. Then anchor a specific follow-up time or suggest a 15-minute walkthrough instead.",
+      "context": "Emails have a very low conversion rate for complex compliance products. The demo is where EqualGround sells itself. The goal is to get them to agree to a brief call even if you also send the email. Including their specific scan results makes the email more compelling and gives a reason to follow up.",
       "example_responses": [
-        "Happy to. What's the best email? And would it help if I included the scan results from your site so you can see what we flagged?",
-        "Sure thing. I'll send that over. Would it make sense to block 15 minutes later this week to walk through what I send? That way I can answer questions live.",
-        "Absolutely. I'll put together the scan results and a quick overview. What's a good email, and is there a day this week I could follow up?"
+        "I can certainly do that. However, EqualGround really clicks once you see how it ties everything together in action. That's why most IT leaders prefer a 15-minute walkthrough. Would you be open to finding a time for that?",
+        "Happy to. What's the best email? I'll include the actual scan results from your site so you can see exactly what we flagged. Would it also make sense to block 15 minutes this week to walk through it live so I can answer questions?",
+        "Absolutely. I'll put together the scan results and a quick overview. But honestly, the platform is one of those things that's much easier to understand when you see it. Could we do a quick 15-minute screen share instead?"
       ]
     },
     "not_my_decision": {
-      "trigger_phrases": ["not my decision", "have to check with", "need to talk to my boss", "need approval", "someone else decides", "I'd need to run it by"],
+      "trigger_phrases": ["not my decision", "have to check with", "need to talk to my boss", "need approval", "someone else decides", "I'd need to run it by", "not the decision maker", "above my pay grade"],
       "tactic": "MAP THE BUYING COMMITTEE",
-      "instructions": "Ask who else is involved. Offer to include them on the demo. Position yourself as helping the prospect build the internal case.",
+      "instructions": "Validate them — they're still the right person to evaluate the technical fit. Ask who else needs to be involved and offer to include them on the demo. Position yourself as helping the prospect build the internal case. Offer to provide materials (one-pager, ROI calculator, scan results) they can share upward. The goal is either a joint demo or equipping this person to champion internally.",
+      "context": "In government and education, purchasing decisions typically involve IT, procurement, and sometimes legal/compliance. The person you're talking to is usually the technical evaluator. They need ammunition to bring to leadership. A demo with their boss included is the fastest path to a decision.",
       "example_responses": [
-        "Totally get it. Who else would need to be in the conversation for this to move forward?",
-        "Makes sense. Would it help if I set up the Zoom so they could join too? Sometimes it's easier to make the case with a live walkthrough.",
-        "Understood. Would it help if I put together a one-pager you could share with them? Or would it be better to just loop them into a quick call?"
+        "Totally get it. You're still the right person to evaluate whether this fits technically though. Who else would need to be in the conversation for this to move forward? I'm happy to set up the Zoom so they can join too.",
+        "Makes sense. Would it help if I put together a one-pager with the scan results from your site and the ROI breakdown? That way you have something concrete to bring to them. Or better yet, would they be open to joining a brief call?",
+        "Understood. A lot of the IT directors I work with use our demo as the pitch to their leadership. It's easier to get buy-in when everyone sees it together. Would it make sense to loop them in?"
       ]
     },
     "too_busy": {
-      "trigger_phrases": ["really busy", "bad time", "swamped", "not a good time", "crazy week", "in the middle of something"],
+      "trigger_phrases": ["really busy", "bad time", "swamped", "not a good time", "crazy week", "in the middle of something", "slammed"],
       "tactic": "RESPECT AND REBOOK",
-      "instructions": "Respect their time immediately. Offer a very specific alternative time. Keep it to 15/ 20 minutes. Make it easy to say yes.",
+      "instructions": "Respect their time immediately — never push. Acknowledge the busy season. Then offer a very specific, short alternative: 15 minutes, later this week or next. Make it easy to say yes by suggesting specific days. Mention you'll share the scan results as a teaser to keep them interested.",
+      "context": "Busy objections are usually real in government IT. End of fiscal year, audit seasons, and legislative deadlines create genuine time pressure. The key is getting a specific rebook — vague 'call me back sometime' never converts. A 15-minute commitment is psychologically much easier than 30.",
       "example_responses": [
-        "Totally get it. I'll keep this quick — would 15 minutes later this week be easier? I just want to share what the scan found on your site.",
-        "No worries at all. When would be a better time? I'm flexible — even a 10-minute call works.",
-        "Understood. Could I call you back Thursday afternoon? It'll be quick — just want to share the scan results."
+        "Totally get it — I'll keep this quick. Would 15 minutes later this week work better? I just want to walk you through what our scan found on your site before the Title II deadline hits.",
+        "No worries at all. When would be a better window? I'm flexible — even a 15-minute call works. I'll send you the scan results ahead of time so we can be efficient with your time.",
+        "Understood. Could I reach back out Thursday or Friday? It'll be brief — 15 minutes max. I'll have the scan results from your site ready to walk through."
       ]
     }
   }
