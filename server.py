@@ -91,10 +91,15 @@ def build_system_prompt(stage_id: str, recent_text: str, call_history: list) -> 
     product = KB_PRODUCT
 
     # --- CORE IDENTITY (always included, ~200 tokens) ---
-    core = f"""You are an elite, consultative Sales Copilot for a YuJa EqualGround Account Executive.
-Your ONLY goal is to analyze the prospect's live speech and feed the sales rep the exact next sentence to say.
+    core = f"""You are a real-time Sales Intelligence Advisor for a YuJa EqualGround Account Executive.
+You analyze the prospect's live speech and surface context, insights, and talking-point ideas so the rep can steer the conversation.
 
-You are ONLY hearing the PROSPECT'S audio. The rep reads your output on a teleprompter — it must sound natural when spoken aloud.
+You are NOT a teleprompter. Do NOT write sentences for the rep to read. Instead, give the rep:
+- What the prospect just revealed (their signal)
+- Why it matters (context)
+- 2-3 short talking-point ideas they can riff on naturally
+
+You are ONLY hearing the PROSPECT'S audio. The rep glances at your output on a side panel during the call.
 
 PRODUCT: {product['company']['elevator_pitch']}
 KEY DIFFERENTIATORS:
@@ -109,13 +114,13 @@ TITLE II DEADLINE: {product['title_ii_compliance']['deadline_large']} for entiti
 ===== CURRENT CALL STAGE: {stage['name']} ({stage['order']}/6) =====
 GOAL: {stage['goal']}
 INSTRUCTIONS: {stage['instructions']}
-WORD LIMIT: Your 'say_this' MUST be under {stage['word_limit']} words. This is critical — the rep reads it live.
 
-EXAMPLE DIALOGUE FOR THIS STAGE:"""
+EXAMPLE — what good advice looks like at this stage:"""
     for ex in stage["few_shot"]:
         stage_section += f"""
-  Prospect: "{ex['prospect']}"
-  -> say_this: "{ex['say_this']}" """
+  Prospect says: "{ex['prospect']}"
+  -> prospect_signal: What they just revealed or implied
+  -> talking_points: 2-3 short ideas the rep could use"""
 
     # --- STAGE TRANSITION RULES ---
     next_stage_name = STAGES_BY_ID[stage["transition_to"]]["name"] if stage["transition_to"] else "N/A (final stage)"
@@ -179,13 +184,13 @@ Anchor: {product['pricing']['anchor']}"""
     # --- TONE GUARDRAILS (always included) ---
     tone = """
 
-===== TONE GUARDRAILS (CRITICAL) =====
-1. Write exactly how a human talks on the phone. Use fragments. Start sentences with "So," "But," "Look," "Yeah."
-2. NEVER use: "delve", "elevate", "navigate", "robust", "seamless", "synergy", "ensure", "leverage", "streamline".
-3. No exclamation points. Calm, slightly detached, authoritative. You are a peer, not a salesperson.
-4. BAD: "I completely understand your concern! Our platform offers a robust solution."
-5. GOOD: "Makes sense. But how are you guys actually handling the Title II stuff right now?"
-6. Match the prospect's energy. If they are brief, you are brief. If they open up, you can expand slightly."""
+===== ADVISOR GUARDRAILS (CRITICAL) =====
+1. Keep it scannable. The rep is mid-conversation — think bullet points, not paragraphs.
+2. Focus on the PROSPECT. What did they just reveal? What does it mean? What angle should the rep explore?
+3. Be specific to what they said. Generic advice like "build rapport" is useless. Reference their actual words.
+4. If you detect a pain point, name it explicitly. If you detect a competitor, call it out.
+5. Talking points should be IDEAS, not scripts. Short phrases the rep can naturally work into conversation.
+6. Match urgency to the moment. If the prospect is about to leave, say so. If they're opening up, note the opportunity."""
 
     # --- OUTPUT FORMAT (always included) ---
     stage_idx = STAGE_ORDER.index(stage_id) + 1 if stage_id in STAGE_ORDER else 1
@@ -196,19 +201,22 @@ Anchor: {product['pricing']['anchor']}"""
 Respond ONLY with this JSON — nothing else:
 {{
   "stage": "{stage_id}",
-  "tactic": "SHORT UPPERCASE TACTIC NAME",
-  "say_this": "The exact sentence the rep should say out loud (UNDER {stage['word_limit']} WORDS)",
+  "tactic": "SHORT UPPERCASE TACTIC NAME (e.g. PAIN POINT, COMPETITOR PIVOT, OBJECTION HANDLE)",
+  "prospect_signal": "One sentence: what the prospect just revealed or implied",
+  "insight": "One sentence: why this matters and what angle to take",
+  "talking_points": ["short idea 1", "short idea 2", "short idea 3"],
   "objection_label": "short objection label OR null",
   "next_milestone": "What the rep should aim for next in one short sentence",
   "stage_progress": "{stage_idx}/6"
 }}
 
 RULES:
-- 'say_this' MUST be under {stage['word_limit']} words. Count them.
-- 'say_this' must sound natural when read aloud on a teleprompter.
-- If the prospect raises an objection, handle it with the appropriate tactic AND set objection_label.
+- 'prospect_signal' must reference what the prospect ACTUALLY said. Be specific.
+- 'insight' is your strategic read — what's the opportunity or risk here?
+- 'talking_points' must be 2-3 SHORT phrase ideas (not full sentences). Max 10 words each.
+- If the prospect raises an objection, handle it in talking_points AND set objection_label.
 - Update 'stage' ONLY when a transition trigger is met. Do not skip stages.
-- 'next_milestone' should tell the rep what to aim for next (e.g., "Confirm they handle accessibility", "Get them to mention their current tool")."""
+- 'next_milestone' should tell the rep what to aim for next."""
 
     return core + stage_section + context_modules + pricing_section + tone + output_rules
 
@@ -328,14 +336,16 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         if "next_milestone" not in guidance:
             guidance["next_milestone"] = STAGES_BY_ID[current_stage]["goal"]
 
-        print(f"  -> [{guidance['tactic']}] {guidance['say_this']}")
+        print(f"  -> [{guidance['tactic']}] {guidance.get('prospect_signal', '')}")
 
         # Push to UI
         await websocket.send_json({
             "type": "navigation",
             "stage": guidance["stage"],
             "tactic": guidance.get("tactic", ""),
-            "say_this": guidance["say_this"],
+            "prospect_signal": guidance.get("prospect_signal", ""),
+            "insight": guidance.get("insight", ""),
+            "talking_points": guidance.get("talking_points", []),
             "objection_label": guidance.get("objection_label"),
             "next_milestone": guidance.get("next_milestone", ""),
             "stage_progress": guidance.get("stage_progress", ""),
@@ -393,9 +403,11 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             elif entry["role"] == "assistant":
                 try:
                     ai_dict = json.loads(entry["content"])
-                    say_this = ai_dict.get("say_this", "")
                     tactic = ai_dict.get("tactic", "")
-                    formatted_transcript += f"COPILOT [{tactic}]: {say_this}\n\n"
+                    signal = ai_dict.get("prospect_signal", "")
+                    insight = ai_dict.get("insight", "")
+                    points = ai_dict.get("talking_points", [])
+                    formatted_transcript += f"COPILOT [{tactic}]: Signal: {signal} | Insight: {insight} | Points: {', '.join(points)}\n\n"
                 except json.JSONDecodeError:
                     pass
 
@@ -411,7 +423,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             "type": "navigation",
             "stage": current_stage,
             "tactic": "READY",
-            "say_this": stage["few_shot"][0]["say_this"],
+            "prospect_signal": "Waiting for prospect to speak...",
+            "insight": stage["goal"],
+            "talking_points": ["Ask for the person who handles website accessibility", "Mention ADA/Title II compliance", "Keep it short — don't pitch yet"],
             "objection_label": None,
             "next_milestone": stage["goal"],
             "stage_progress": "1/6",

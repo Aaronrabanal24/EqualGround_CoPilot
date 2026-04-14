@@ -11,7 +11,9 @@ type Transcript = {
 type Navigation = {
   stage: string;
   tactic: string;
-  say_this: string;
+  prospect_signal: string;
+  insight: string;
+  talking_points: string[];
   objection_label: string | null;
   next_milestone: string;
   stage_progress: string;
@@ -27,7 +29,9 @@ type IncomingMessage =
       type: "navigation";
       stage: string;
       tactic: string;
-      say_this: string;
+      prospect_signal: string;
+      insight: string;
+      talking_points: string[];
       objection_label: string | null;
       next_milestone: string;
       stage_progress: string;
@@ -64,7 +68,9 @@ export default function Home() {
   const [navigation, setNavigation] = useState<Navigation>({
     stage: "GATEKEEPER",
     tactic: "",
-    say_this: "Waiting for connection...",
+    prospect_signal: "Waiting for connection...",
+    insight: "",
+    talking_points: [],
     objection_label: null,
     next_milestone: "",
     stage_progress: "1/6",
@@ -89,13 +95,13 @@ export default function Home() {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcripts]);
 
-  // Animate say_this on change
+  // Animate panel on change
   useEffect(() => {
-    if (navigation.say_this !== prevSayThis) {
-      setPrevSayThis(navigation.say_this);
+    if (navigation.prospect_signal !== prevSayThis) {
+      setPrevSayThis(navigation.prospect_signal);
       setSayThisKey((k) => k + 1);
     }
-  }, [navigation.say_this, prevSayThis]);
+  }, [navigation.prospect_signal, prevSayThis]);
 
   useEffect(() => {
     let wsUrl: string;
@@ -126,7 +132,9 @@ export default function Home() {
         setNavigation({
           stage: data.stage,
           tactic: data.tactic,
-          say_this: data.say_this,
+          prospect_signal: data.prospect_signal ?? "",
+          insight: data.insight ?? "",
+          talking_points: data.talking_points ?? [],
           objection_label: data.objection_label ?? null,
           next_milestone: data.next_milestone ?? "",
           stage_progress: data.stage_progress ?? "",
@@ -583,14 +591,39 @@ export default function Home() {
           </div>
         )}
 
-        {/* SAY THIS — Main Teleprompter */}
-        <div className="flex flex-1 items-center justify-center px-8 py-6">
-          <p
-            key={sayThisKey}
-            className="text-center text-2xl font-semibold leading-relaxed text-white teleprompter-fade"
-          >
-            {navigation.say_this}
-          </p>
+        {/* Advisor Panel */}
+        <div key={sayThisKey} className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar teleprompter-fade">
+
+          {/* Prospect Signal */}
+          {navigation.prospect_signal && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-1.5">Prospect Signal</p>
+              <p className="text-sm leading-relaxed text-gray-300">{navigation.prospect_signal}</p>
+            </div>
+          )}
+
+          {/* Insight */}
+          {navigation.insight && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1.5">Insight</p>
+              <p className="text-sm leading-relaxed text-gray-300">{navigation.insight}</p>
+            </div>
+          )}
+
+          {/* Talking Points */}
+          {navigation.talking_points.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">Talking Points</p>
+              <ul className="space-y-2">
+                {navigation.talking_points.map((point, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
+                    <span className="text-base font-medium leading-relaxed text-white">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Next Milestone Footer */}
