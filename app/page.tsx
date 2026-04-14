@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Transcript = {
   speaker: string;
   text: string;
+  timestamp: string;
 };
 
 type Navigation = {
@@ -36,32 +37,64 @@ type IncomingMessage =
       text: string;
     };
 
+const STAGE_LABELS = ["Gatekeeper", "Intro", "Credibility", "Discovery", "Pitch", "CTA"];
+
+function getTimestamp(): string {
+  return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function CallTimer({ running }: { running: boolean }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [running]);
+  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const s = (seconds % 60).toString().padStart(2, "0");
+  return <span className="font-mono text-sm tabular-nums">{m}:{s}</span>;
+}
+
 export default function Home() {
-  const [transcripts, setTranscripts] = useState<Transcript[]>([
-    { speaker: "System", text: "Connecting to AI Call GPS..." },
-  ]);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [navigation, setNavigation] = useState<Navigation>({
-    stage: "Initializing...",
+    stage: "GATEKEEPER",
     tactic: "",
-    say_this: "Waiting for call guidance...",
+    say_this: "Waiting for connection...",
     objection_label: null,
     next_milestone: "",
     stage_progress: "1/6",
   });
   const [isListening, setIsListening] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [prevSayThis, setPrevSayThis] = useState("");
+  const [sayThisKey, setSayThisKey] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll transcript
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcripts]);
+
+  // Animate say_this on change
+  useEffect(() => {
+    if (navigation.say_this !== prevSayThis) {
+      setPrevSayThis(navigation.say_this);
+      setSayThisKey((k) => k + 1);
+    }
+  }, [navigation.say_this, prevSayThis]);
 
   useEffect(() => {
-    // In production, use the Render deployment URL.
-    // In dev, detect if we're in a Codespace (proxied via HTTPS) or truly local.
     let wsUrl: string;
     if (process.env.NODE_ENV === "production") {
       wsUrl = "wss://equalground-copilot.onrender.com/ws/ui";
     } else if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
-      // GitHub Codespaces: replace the frontend port with 8000 for the backend
       const host = window.location.hostname.replace(/-\d+\./, "-8000.");
       wsUrl = `wss://${host}/ws/ui`;
     } else {
@@ -71,14 +104,14 @@ export default function Home() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setTranscripts([{ speaker: "System", text: "🟢 Connected! AI GPS Ready. Click 'Start Microphone' to begin." }]);
+      setConnected(true);
+      setTranscripts([{ speaker: "System", text: "Connected. Ready when you are.", timestamp: getTimestamp() }]);
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data) as IncomingMessage;
-
       if (data.type === "transcript") {
-        setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text }]);
+        setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
       } else if (data.type === "navigation") {
         setNavigation({
           stage: data.stage,
@@ -90,219 +123,323 @@ export default function Home() {
         });
       } else if (data.type === "summary") {
         setSummary(data.text);
+        setIsGeneratingSummary(false);
       }
     };
 
     ws.onerror = () => {
+      setConnected(false);
       setTranscripts((prev) => [
         ...prev,
-        { speaker: "System", text: "❌ Connection error. Check that the backend is running on port 8000." },
+        { speaker: "System", text: "Connection error. Check that the backend is running on port 8000.", timestamp: getTimestamp() },
       ]);
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
     };
 
     return () => {
       ws.close();
-      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  async function toggleMicrophone() {
+  const toggleMicrophone = useCallback(async () => {
     if (isListening) {
-      recognitionRef.current?.stop();
+      // Stop recording
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaRecorderRef.current = null;
+      mediaStreamRef.current = null;
       setIsListening(false);
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Your browser does not support speech recognition. Please use Chrome.");
-      return;
-    }
-
-    // Force Chrome to pass raw audio without echo cancellation (fixes Stereo Mix muting)
     try {
-      await navigator.mediaDevices.getUserMedia({
+      // Capture mic audio — raw, no processing
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
+          sampleRate: 16000,
+          channelCount: 1,
         },
       });
+      mediaStreamRef.current = stream;
+
+      // We need to convert to 16-bit PCM (linear16) for Deepgram.
+      // Use AudioContext to resample + extract raw PCM, then send in 250ms chunks.
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      let audioBuffer: Int16Array[] = [];
+      let sampleCount = 0;
+      const samplesPerChunk = 16000 / 4; // 250ms at 16kHz = 4000 samples
+
+      processor.onaudioprocess = (e) => {
+        if (!mediaRecorderRef.current) return;
+        const float32 = e.inputBuffer.getChannelData(0);
+        // Convert float32 [-1,1] to int16
+        const int16 = new Int16Array(float32.length);
+        for (let i = 0; i < float32.length; i++) {
+          const s = Math.max(-1, Math.min(1, float32[i]));
+          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+        audioBuffer.push(int16);
+        sampleCount += int16.length;
+
+        // Flush every ~250ms worth of samples
+        if (sampleCount >= samplesPerChunk) {
+          const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
+          const merged = new Int16Array(totalLen);
+          let offset = 0;
+          for (const chunk of audioBuffer) {
+            merged.set(chunk, offset);
+            offset += chunk.length;
+          }
+          // Send raw PCM bytes to server
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(merged.buffer);
+          }
+          audioBuffer = [];
+          sampleCount = 0;
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      // Use a sentinel object so we can check if recording is active
+      mediaRecorderRef.current = { stop: () => {
+        processor.disconnect();
+        source.disconnect();
+        audioContext.close();
+      }} as unknown as MediaRecorder;
+
+      setIsListening(true);
     } catch (err) {
-      console.warn("Could not acquire raw audio stream:", err);
+      console.error("Could not start audio capture:", err);
+      alert("Microphone access denied or unavailable.");
     }
+  }, [isListening]);
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      if (!transcript) return;
-      console.log("Mic captured:", transcript);
-      wsRef.current?.send(JSON.stringify({ type: "transcript", text: transcript }));
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.start();
-    setIsListening(true);
-  }
-
-  function endCall() {
-    // Stop the microphone
-    recognitionRef.current?.stop();
+  const endCall = useCallback(() => {
+    mediaRecorderRef.current?.stop();
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaRecorderRef.current = null;
+    mediaStreamRef.current = null;
     setIsListening(false);
-    // Tell the backend to generate a summary
+    setIsGeneratingSummary(true);
     wsRef.current?.send(JSON.stringify({ type: "end_call" }));
-  }
+  }, []);
 
-  // If we have a summary, show the full-screen summary view
+  // ─── Summary View ───
   if (summary) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-900 p-12 text-slate-100 font-sans">
-        <div className="w-full max-w-3xl space-y-8">
-          <div className="text-center">
-            <span className="inline-block rounded-full bg-green-600 px-6 py-2 text-sm font-bold uppercase tracking-widest text-white">
-              Call Complete
-            </span>
-            <h1 className="mt-6 text-4xl font-bold text-white">Post-Call Summary</h1>
-            <p className="mt-2 text-slate-400">CRM-ready summary generated by AI</p>
+      <div className="flex h-screen w-full items-center justify-center bg-gray-950 p-8 text-gray-100 font-sans">
+        <div className="w-full max-w-3xl space-y-6 fade-in">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-5 py-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Call Complete</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white">Post-Call Summary</h1>
           </div>
-          <div className="whitespace-pre-wrap rounded-xl border border-slate-700 bg-slate-800 p-8 text-lg leading-relaxed text-slate-200 shadow-lg">
+          <div className="whitespace-pre-wrap rounded-2xl border border-gray-800 bg-gray-900 p-8 text-base leading-relaxed text-gray-300 shadow-2xl max-h-[60vh] overflow-y-auto custom-scrollbar">
             {summary}
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full rounded-lg bg-blue-600 py-4 text-lg font-bold uppercase tracking-wider text-white transition-all hover:bg-blue-700"
-          >
-            Start New Call
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { navigator.clipboard.writeText(summary); }}
+              className="flex-1 rounded-xl border border-gray-700 bg-gray-800 py-3.5 text-sm font-semibold text-gray-300 transition-all hover:bg-gray-700 hover:border-gray-600 active:scale-[0.98]"
+            >
+              Copy to Clipboard
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white transition-all hover:bg-blue-500 active:scale-[0.98]"
+            >
+              Start New Call
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans">
-      {/* LEFT SIDE: Live Transcript */}
-      <div className="w-3/5 border-r border-slate-700 p-8 flex flex-col">
-        <h1 className="mb-6 text-2xl font-bold text-blue-400">Live Transcript</h1>
+  const currentStageNum = parseInt(navigation.stage_progress?.split("/")[0] || "1");
 
-        <div className="flex flex-1 flex-col space-y-4 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-6 shadow-inner">
-          {transcripts.map((transcript, index) => (
-            <p key={index} className="leading-relaxed">
-              <span
-                className={`font-semibold ${
-                  transcript.speaker === "System"
-                    ? "text-slate-400"
-                    : transcript.speaker === "Prospect"
-                      ? "text-blue-300"
-                      : "text-green-300"
-                }`}
-              >
-                {transcript.speaker}:
-              </span>{" "}
-              "{transcript.text}"
-            </p>
-          ))}
+  return (
+    <div className="flex h-screen w-full bg-gray-950 text-gray-100 font-sans">
+
+      {/* ─── LEFT: Transcript Panel ─── */}
+      <div className="w-3/5 flex flex-col border-r border-gray-800/60">
+
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60 bg-gray-950">
+          <div className="flex items-center gap-3">
+            <div className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]"}`} />
+            <h1 className="text-lg font-semibold text-white">Live Transcript</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            {isListening && (
+              <div className="flex items-center gap-2 text-red-400">
+                <div className="mic-pulse h-2 w-2 rounded-full bg-red-400" />
+                <span className="text-xs font-medium uppercase tracking-wider">Recording</span>
+              </div>
+            )}
+            <div className="text-gray-500">
+              <CallTimer running={isListening} />
+            </div>
+          </div>
         </div>
 
-        {/* Microphone + End Call Buttons */}
-        <div className="mt-6 flex gap-4">
-          <button
-            onClick={toggleMicrophone}
-            disabled={!!summary}
-            className={`flex-1 rounded-lg py-4 text-lg font-bold uppercase tracking-wider transition-all ${
-              isListening
-                ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-                : "bg-green-600 hover:bg-green-700 text-white"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isListening ? "🔴 Stop Microphone" : "🎤 Start Microphone"}
-          </button>
-          <button
-            onClick={endCall}
-            disabled={!!summary}
-            className="flex-1 rounded-lg bg-red-800 py-4 text-lg font-bold uppercase tracking-wider text-white transition-all hover:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            📋 End Call & Summarize
-          </button>
+        {/* Transcript Feed */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 custom-scrollbar">
+          {transcripts.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center h-full">
+              <p className="text-gray-600 text-sm">Transcript will appear here once the call starts...</p>
+            </div>
+          ) : (
+            transcripts.map((t, i) => (
+              <div key={i} className={`flex gap-3 items-start fade-in ${t.speaker === "System" ? "opacity-50" : ""}`}>
+                <span className="text-[10px] text-gray-600 font-mono pt-1 shrink-0 w-16 tabular-nums">{t.timestamp}</span>
+                <div className="min-w-0">
+                  <span
+                    className={`text-xs font-bold uppercase tracking-wider ${
+                      t.speaker === "System"
+                        ? "text-gray-500"
+                        : t.speaker === "Prospect"
+                          ? "text-blue-400"
+                          : "text-emerald-400"
+                    }`}
+                  >
+                    {t.speaker}
+                  </span>
+                  <p className="text-sm leading-relaxed text-gray-300 mt-0.5">{t.text}</p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={transcriptEndRef} />
+        </div>
+
+        {/* Controls Bar */}
+        <div className="px-6 py-4 border-t border-gray-800/60 bg-gray-950">
+          <div className="flex gap-3">
+            <button
+              onClick={toggleMicrophone}
+              disabled={!!summary || !connected}
+              className={`flex-1 flex items-center justify-center gap-2.5 rounded-xl py-3.5 text-sm font-semibold transition-all active:scale-[0.98] ${
+                isListening
+                  ? "bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20"
+                  : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+              } disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100`}
+            >
+              <span className="text-lg">{isListening ? "◼" : "●"}</span>
+              {isListening ? "Stop Recording" : "Start Recording"}
+            </button>
+            <button
+              onClick={endCall}
+              disabled={!!summary || !connected || isGeneratingSummary}
+              className="flex items-center justify-center gap-2.5 rounded-xl border border-gray-700 bg-gray-800 px-6 py-3.5 text-sm font-semibold text-gray-300 transition-all hover:bg-gray-700 hover:border-gray-600 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {isGeneratingSummary ? (
+                <>
+                  <span className="spinner h-4 w-4 border-2 border-gray-500 border-t-white rounded-full" />
+                  Generating...
+                </>
+              ) : (
+                "End Call"
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE: Call Guide (Teleprompter) */}
-      <div className="w-2/5 bg-slate-950 p-8 flex flex-col">
-        {/* Stage Progress Bar */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              Stage {navigation.stage_progress}
-            </span>
-            <div className="flex items-center gap-3">
-              {navigation.objection_label && (
-                <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white animate-pulse">
-                  {navigation.objection_label}
-                </span>
-              )}
-              <span
-                className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white ${
-                  navigation.stage.toLowerCase().includes("objection")
-                    ? "bg-red-600"
-                    : "bg-amber-600"
-                }`}
-              >
-                {navigation.stage}
-              </span>
-            </div>
-          </div>
-          {/* Progress bar track */}
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5, 6].map((step) => {
-              const current = parseInt(navigation.stage_progress?.split("/")[0] || "1");
+      {/* ─── RIGHT: Teleprompter Panel ─── */}
+      <div className="w-2/5 flex flex-col bg-gray-900/50">
+
+        {/* Stage Progress Header */}
+        <div className="px-6 py-4 border-b border-gray-800/60">
+          {/* Stage step indicators */}
+          <div className="flex gap-1 mb-3">
+            {STAGE_LABELS.map((label, i) => {
+              const step = i + 1;
+              const isActive = step === currentStageNum;
+              const isDone = step < currentStageNum;
               return (
-                <div
-                  key={step}
-                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                    step <= current ? "bg-green-500" : "bg-slate-700"
-                  }`}
-                />
+                <div key={label} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div
+                    className={`h-1 w-full rounded-full transition-all duration-500 ${
+                      isDone
+                        ? "bg-emerald-500"
+                        : isActive
+                          ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
+                          : "bg-gray-800"
+                    }`}
+                  />
+                  <span
+                    className={`text-[9px] font-semibold uppercase tracking-wider transition-colors ${
+                      isDone ? "text-emerald-500" : isActive ? "text-blue-400" : "text-gray-600"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
               );
             })}
           </div>
+
+          {/* Active badge row */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1">
+                <span className="text-xs font-bold text-blue-400">{navigation.stage}</span>
+              </span>
+            </div>
+            {navigation.objection_label && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1 objection-flash">
+                <div className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                <span className="text-xs font-bold text-red-400">{navigation.objection_label}</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Tactic Header */}
-        <div className="mt-4">
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-400">
-            {navigation.tactic}
-          </p>
-        </div>
+        {/* Tactic Label */}
+        {navigation.tactic && (
+          <div className="px-6 pt-4">
+            <span className="inline-block rounded-md bg-gray-800 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-gray-400">
+              {navigation.tactic}
+            </span>
+          </div>
+        )}
 
-        {/* SAY THIS — Giant Teleprompter */}
-        <div className="flex flex-1 items-center justify-center px-4">
-          <p className="text-center text-3xl font-bold leading-relaxed text-green-300">
+        {/* SAY THIS — Main Teleprompter */}
+        <div className="flex flex-1 items-center justify-center px-8 py-6">
+          <p
+            key={sayThisKey}
+            className="text-center text-2xl font-semibold leading-relaxed text-white teleprompter-fade"
+          >
             {navigation.say_this}
           </p>
         </div>
 
-        {/* Next Milestone — bottom */}
+        {/* Next Milestone Footer */}
         {navigation.next_milestone && (
-          <div className="mt-auto pt-4 border-t border-slate-800">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Next Goal</p>
-            <p className="text-sm text-slate-400">{navigation.next_milestone}</p>
+          <div className="px-6 py-4 border-t border-gray-800/60">
+            <div className="flex items-start gap-2">
+              <span className="text-gray-600 mt-0.5 text-sm">→</span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-0.5">Next Goal</p>
+                <p className="text-xs text-gray-400 leading-relaxed">{navigation.next_milestone}</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

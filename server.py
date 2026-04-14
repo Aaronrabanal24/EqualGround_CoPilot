@@ -1,15 +1,21 @@
 import os
 import json
+import asyncio
 from pathlib import Path
+from urllib.parse import urlencode
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
+import websockets as ws_client
 
 # Load environment variables
 load_dotenv(dotenv_path=".env.local", override=True)
 
 app = FastAPI()
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 # ---------------------------------------------------------
 # LOAD KNOWLEDGE BASE FROM FILES
@@ -234,14 +240,135 @@ async def root():
 
 
 # ---------------------------------------------------------
-# WEBSOCKET REAL-TIME ENGINE
+# WEBSOCKET REAL-TIME ENGINE (DEEPGRAM BINARY AUDIO)
 # ---------------------------------------------------------
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
     await websocket.accept()
     call_history: list[dict] = []
     current_stage = "GATEKEEPER"
+    dg_ws = None
+    transcript_task = None
+    dg_listener_task = None
     print("Client connected to WebSocket")
+
+    # ------ helper: process a final transcript from Deepgram ------
+    async def _handle_transcript(user_text: str):
+        nonlocal current_stage
+
+        if not user_text.strip():
+            return
+
+        print(f"[{current_stage}] Prospect: {user_text}")
+
+        # Echo transcript back to UI
+        await websocket.send_json({
+            "type": "transcript",
+            "speaker": "Prospect",
+            "text": user_text,
+        })
+
+        # Log prospect's speech
+        call_history.append({"role": "user", "content": user_text})
+
+        # Build stage-aware prompt + smart context window
+        system_prompt = build_system_prompt(current_stage, user_text, call_history)
+        context = build_context_window(call_history)
+        messages = [{"role": "system", "content": system_prompt}] + context
+
+        # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) ---
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+
+        ai_response_text = response.choices[0].message.content
+
+        # Log AI advice to history
+        call_history.append({"role": "assistant", "content": ai_response_text})
+
+        # Parse JSON response
+        guidance = json.loads(ai_response_text)
+        if "objection_label" not in guidance:
+            guidance["objection_label"] = None
+
+        # Advance stage (enforced: forward only, max 1 step)
+        ai_stage = guidance.get("stage", current_stage)
+        current_stage = advance_stage(current_stage, ai_stage)
+        guidance["stage"] = current_stage
+
+        # Fill in defaults for new fields
+        stage_idx = STAGE_ORDER.index(current_stage) + 1 if current_stage in STAGE_ORDER else 1
+        if "stage_progress" not in guidance:
+            guidance["stage_progress"] = f"{stage_idx}/6"
+        if "next_milestone" not in guidance:
+            guidance["next_milestone"] = STAGES_BY_ID[current_stage]["goal"]
+
+        print(f"  -> [{guidance['tactic']}] {guidance['say_this']}")
+
+        # Push to UI
+        await websocket.send_json({
+            "type": "navigation",
+            "stage": guidance["stage"],
+            "tactic": guidance.get("tactic", ""),
+            "say_this": guidance["say_this"],
+            "objection_label": guidance.get("objection_label"),
+            "next_milestone": guidance.get("next_milestone", ""),
+            "stage_progress": guidance.get("stage_progress", ""),
+        })
+
+    # ------ helper: generate post-call summary ------
+    async def _generate_summary():
+        print("Generating post-call summary using gpt-4o...")
+
+        summary_prompt = (
+            "Based on this call history, generate a CRM-ready summary with these sections:\n"
+            "1. **Call Outcome**: One sentence — did we book a meeting, get a follow-up, or get rejected?\n"
+            "2. **Prospect Info**: Name, title, organization (if mentioned)\n"
+            "3. **Pain Points Uncovered**: Bullet points\n"
+            "4. **Objections Raised**: Bullet points with how they were handled\n"
+            "5. **Competitor Mentioned**: If any\n"
+            "6. **Recommended Next Steps**: Specific actions with timeline\n"
+            "7. **Call Stage Reached**: Which stage did the call get to?"
+        )
+        transcript_text = "\n".join(
+            f"{entry['role']}: {entry['content']}" for entry in call_history
+        )
+        summary_messages = [
+            {"role": "system", "content": summary_prompt},
+            {"role": "user", "content": transcript_text},
+        ]
+
+        summary_response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=summary_messages,
+        )
+
+        final_summary = summary_response.choices[0].message.content
+
+        # Format raw transcript
+        formatted_transcript = (
+            "\n\n=======================\n"
+            "FULL TRANSCRIPT\n"
+            "=======================\n\n"
+        )
+        for entry in call_history:
+            if entry["role"] == "user":
+                formatted_transcript += f"PROSPECT: {entry['content']}\n\n"
+            elif entry["role"] == "assistant":
+                try:
+                    ai_dict = json.loads(entry["content"])
+                    say_this = ai_dict.get("say_this", "")
+                    tactic = ai_dict.get("tactic", "")
+                    formatted_transcript += f"COPILOT [{tactic}]: {say_this}\n\n"
+                except json.JSONDecodeError:
+                    pass
+
+        await websocket.send_json({
+            "type": "summary",
+            "text": final_summary + formatted_transcript,
+        })
 
     try:
         # Send initial guidance
@@ -256,128 +383,102 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             "stage_progress": "1/6",
         })
 
-        async for message in websocket.iter_text():
-            data = json.loads(message)
+        # --- Connect to Deepgram's streaming WebSocket API ---
+        dg_params = urlencode({
+            "model": "nova-2",
+            "language": "en-US",
+            "smart_format": "true",
+            "encoding": "linear16",
+            "sample_rate": "16000",
+            "channels": "1",
+            "interim_results": "true",
+            "utterance_end_ms": "1500",
+            "vad_events": "true",
+        })
+        dg_url = f"wss://api.deepgram.com/v1/listen?{dg_params}"
+        dg_headers = {"Authorization": f"Token {DEEPGRAM_API_KEY}"}
 
-            # --- DUAL MODEL: SUMMARY PHASE (GPT-4o) ---
-            if data.get("type") == "end_call":
-                print("Generating post-call summary using gpt-4o...")
+        print(f"Connecting to Deepgram...")
+        try:
+            dg_ws = await ws_client.connect(dg_url, additional_headers=dg_headers, proxy=None)
+        except ws_client.exceptions.InvalidStatus as e:
+            body = e.response.body.decode() if e.response.body else "no body"
+            print(f"Deepgram rejected: HTTP {e.response.status_code} - {body}")
+            raise
+        print("Deepgram live WebSocket connected")
 
-                summary_prompt = (
-                    "Based on this call history, generate a CRM-ready summary with these sections:\n"
-                    "1. **Call Outcome**: One sentence — did we book a meeting, get a follow-up, or get rejected?\n"
-                    "2. **Prospect Info**: Name, title, organization (if mentioned)\n"
-                    "3. **Pain Points Uncovered**: Bullet points\n"
-                    "4. **Objections Raised**: Bullet points with how they were handled\n"
-                    "5. **Competitor Mentioned**: If any\n"
-                    "6. **Recommended Next Steps**: Specific actions with timeline\n"
-                    "7. **Call Stage Reached**: Which stage did the call get to?"
-                )
-                transcript_text = "\n".join(
-                    f"{entry['role']}: {entry['content']}" for entry in call_history
-                )
-                summary_messages = [
-                    {"role": "system", "content": summary_prompt},
-                    {"role": "user", "content": transcript_text},
-                ]
+        transcript_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
-                summary_response = await client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=summary_messages,
-                )
+        # --- Background task: read transcripts from Deepgram ---
+        async def listen_to_deepgram():
+            try:
+                async for msg in dg_ws:
+                    data = json.loads(msg)
+                    # Only process final (non-interim) speech results
+                    if data.get("type") == "Results" and data.get("is_final"):
+                        transcript = (
+                            data.get("channel", {})
+                            .get("alternatives", [{}])[0]
+                            .get("transcript", "")
+                        )
+                        if transcript.strip():
+                            await transcript_queue.put(transcript)
+            except ws_client.exceptions.ConnectionClosed:
+                print("Deepgram connection closed")
+            except Exception as e:
+                print(f"Deepgram listener error: {e}")
+            finally:
+                await transcript_queue.put(None)
 
-                final_summary = summary_response.choices[0].message.content
+        dg_listener_task = asyncio.create_task(listen_to_deepgram())
 
-                # Format raw transcript
-                formatted_transcript = (
-                    "\n\n=======================\n"
-                    "FULL TRANSCRIPT\n"
-                    "=======================\n\n"
-                )
-                for entry in call_history:
-                    if entry["role"] == "user":
-                        formatted_transcript += f"PROSPECT: {entry['content']}\n\n"
-                    elif entry["role"] == "assistant":
-                        try:
-                            ai_dict = json.loads(entry["content"])
-                            say_this = ai_dict.get("say_this", "")
-                            tactic = ai_dict.get("tactic", "")
-                            formatted_transcript += f"COPILOT [{tactic}]: {say_this}\n\n"
-                        except json.JSONDecodeError:
-                            pass
+        # --- Background task: drain transcript queue -> OpenAI ---
+        async def process_transcripts():
+            while True:
+                text = await transcript_queue.get()
+                if text is None:
+                    break
+                try:
+                    if websocket.client_state == WebSocketState.CONNECTED:
+                        await _handle_transcript(text)
+                except Exception as e:
+                    print(f"Error processing transcript: {e}")
 
-                await websocket.send_json({
-                    "type": "summary",
-                    "text": final_summary + formatted_transcript,
-                })
+        transcript_task = asyncio.create_task(process_transcripts())
+
+        # --- Main loop: receive frames from browser ---
+        while True:
+            message = await websocket.receive()
+
+            if message["type"] == "websocket.disconnect":
                 break
 
-            # --- NORMAL LIVE CALL FLOW ---
-            if data.get("type") == "transcript":
-                user_text = data.get("text", "").strip()
-                if not user_text:
-                    continue
+            # Binary audio frames -> forward to Deepgram
+            if "bytes" in message and message["bytes"]:
+                await dg_ws.send(message["bytes"])
 
-                print(f"[{current_stage}] Prospect: {user_text}")
+            # Text JSON commands (end_call, etc.)
+            elif "text" in message and message["text"]:
+                data = json.loads(message["text"])
 
-                # Echo transcript back to UI
-                await websocket.send_json({
-                    "type": "transcript",
-                    "speaker": "Prospect",
-                    "text": user_text,
-                })
-
-                # Log prospect's speech
-                call_history.append({"role": "user", "content": user_text})
-
-                # Build stage-aware prompt + smart context window
-                system_prompt = build_system_prompt(current_stage, user_text, call_history)
-                context = build_context_window(call_history)
-                messages = [{"role": "system", "content": system_prompt}] + context
-
-                # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) ---
-                response = await client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages,
-                    response_format={"type": "json_object"},
-                )
-
-                ai_response_text = response.choices[0].message.content
-
-                # Log AI advice to history
-                call_history.append({"role": "assistant", "content": ai_response_text})
-
-                # Parse JSON response
-                guidance = json.loads(ai_response_text)
-                if "objection_label" not in guidance:
-                    guidance["objection_label"] = None
-
-                # Advance stage (enforced: forward only, max 1 step)
-                ai_stage = guidance.get("stage", current_stage)
-                current_stage = advance_stage(current_stage, ai_stage)
-                guidance["stage"] = current_stage
-
-                # Fill in defaults for new fields
-                stage_idx = STAGE_ORDER.index(current_stage) + 1 if current_stage in STAGE_ORDER else 1
-                if "stage_progress" not in guidance:
-                    guidance["stage_progress"] = f"{stage_idx}/6"
-                if "next_milestone" not in guidance:
-                    guidance["next_milestone"] = STAGES_BY_ID[current_stage]["goal"]
-
-                print(f"  -> [{guidance['tactic']}] {guidance['say_this']}")
-
-                # Push to UI
-                await websocket.send_json({
-                    "type": "navigation",
-                    "stage": guidance["stage"],
-                    "tactic": guidance.get("tactic", ""),
-                    "say_this": guidance["say_this"],
-                    "objection_label": guidance.get("objection_label"),
-                    "next_milestone": guidance.get("next_milestone", ""),
-                    "stage_progress": guidance.get("stage_progress", ""),
-                })
+                if data.get("type") == "end_call":
+                    await _generate_summary()
+                    break
 
     except WebSocketDisconnect:
         print("Client disconnected from WebSocket")
     except Exception as e:
         print(f"Error in WebSocket: {e}")
+    finally:
+        # Clean up Deepgram connection and background tasks
+        if dg_ws:
+            try:
+                await dg_ws.close()
+            except Exception:
+                pass
+        if transcript_task:
+            await transcript_queue.put(None)
+            transcript_task.cancel()
+        if dg_listener_task:
+            dg_listener_task.cancel()
+        print("WebSocket session ended")
