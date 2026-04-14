@@ -250,10 +250,6 @@ def advance_stage(current_stage: str, ai_stage: str) -> str:
 async def root():
     return {"status": "EqualGround AI Copilot Engine is Live and Running!"}
 
-@app.get("/debug/keycheck")
-async def debug_keycheck():
-    return {"key_length": len(COPILOT_API_KEY), "key_prefix": COPILOT_API_KEY[:4] if COPILOT_API_KEY else "EMPTY"}
-
 
 # ---------------------------------------------------------
 # WEBSOCKET REAL-TIME ENGINE (DEEPGRAM BINARY AUDIO)
