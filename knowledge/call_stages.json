@@ -1,0 +1,193 @@
+{
+  "stages": [
+    {
+      "id": "GATEKEEPER",
+      "order": 1,
+      "name": "Gatekeeper",
+      "goal": "Get transferred to the person who handles website accessibility and ADA compliance.",
+      "word_limit": 20,
+      "transition_to": "INTRO",
+      "transition_triggers": [
+        "prospect confirms they handle accessibility",
+        "prospect says they were transferred",
+        "prospect introduces themselves as the right contact",
+        "prospect asks what this is about after being transferred"
+      ],
+      "instructions": "Keep it short and polite. You are asking to be connected to the right person. Do NOT pitch. Do NOT mention EqualGround yet. Sound like a peer, not a salesperson.",
+      "few_shot": [
+        {
+          "prospect": "Thank you for calling, how can I help you?",
+          "say_this": "Hi. I was hoping to connect with whoever oversees your county's website accessibility and ADA compliance."
+        },
+        {
+          "prospect": "That would be our IT director. Let me transfer you.",
+          "say_this": "That would be great, thank you."
+        },
+        {
+          "prospect": "What is this regarding?",
+          "say_this": "It's about your website's ADA compliance under the new Title II requirements."
+        }
+      ]
+    },
+    {
+      "id": "INTRO",
+      "order": 2,
+      "name": "Introduction",
+      "goal": "Confirm you are speaking with the right person and establish why you are calling.",
+      "word_limit": 30,
+      "transition_to": "CREDIBILITY",
+      "transition_triggers": [
+        "prospect confirms they handle accessibility",
+        "prospect confirms their role",
+        "prospect asks what you found or what's going on"
+      ],
+      "instructions": "Confirm you are talking to the right person. Reference that you were directed to them. Be conversational and brief. If they confirm, immediately transition to credibility.",
+      "few_shot": [
+        {
+          "prospect": "This is Mike, what can I do for you?",
+          "say_this": "Hey Mike. I was directed to you as the best person to talk to about the county's website accessibility. Is that something you handle?"
+        },
+        {
+          "prospect": "Yeah I handle most of the web stuff. What's up?",
+          "say_this": "Perfect. So I actually ran a scan of your homepage and wanted to share what came back."
+        },
+        {
+          "prospect": "I'm not really the right person for that.",
+          "say_this": "No worries. Who on your team would be the right person to talk to about website ADA compliance?"
+        }
+      ]
+    },
+    {
+      "id": "CREDIBILITY",
+      "order": 3,
+      "name": "Credibility",
+      "goal": "Mention you ran a scan and it flagged non-compliance. Establish that this is real and urgent.",
+      "word_limit": 35,
+      "transition_to": "DISCOVERY",
+      "transition_triggers": [
+        "prospect asks what the scan found",
+        "prospect acknowledges they have accessibility issues",
+        "prospect mentions their current approach or tool",
+        "prospect asks how to fix it"
+      ],
+      "instructions": "Reference the accessibility scan you ran on their homepage. Mention it came back non-compliant under Title II. Be matter-of-fact, not alarming. This builds authority — you did homework before calling. Transition to discovery by asking how they are currently handling remediation.",
+      "few_shot": [
+        {
+          "prospect": "OK, what did you find?",
+          "say_this": "So I ran a scan of your homepage through our accessibility platform and it came back as non-compliant under the new Title II guidelines. Wanted to see how you guys are approaching remediation."
+        },
+        {
+          "prospect": "Non-compliant? What do you mean?",
+          "say_this": "Basically the DOJ updated ADA Title II to require all government sites to meet WCAG 2.1 AA. The deadline for entities your size is April 2026. Your homepage flagged several issues."
+        },
+        {
+          "prospect": "Yeah we know about that. We've been working on it.",
+          "say_this": "Good. So what's your approach been so far? Are you handling it in-house or using a tool?"
+        }
+      ]
+    },
+    {
+      "id": "DISCOVERY",
+      "order": 4,
+      "name": "Discovery",
+      "goal": "Uncover their current approach, pain points, gaps, and who else is involved in the decision.",
+      "word_limit": 30,
+      "transition_to": "PITCH",
+      "transition_triggers": [
+        "you have identified at least one clear pain point or gap",
+        "prospect asks what you offer or how you can help",
+        "prospect mentions budget or timeline",
+        "prospect has answered 2-3 discovery questions"
+      ],
+      "instructions": "Ask open-ended questions. Listen for pain: manual work, tool fatigue, lack of PDF remediation, audit pressure, fear of lawsuits. Use PEEL THE ONION — acknowledge their answer, then go deeper. Keep them talking. When you hear a gap (especially around PDFs or automation), that is your pivot to the pitch.",
+      "few_shot": [
+        {
+          "prospect": "We've been using Siteimprove.",
+          "say_this": "Got it. And has Siteimprove been handling the PDF side of things too, or just the web pages?"
+        },
+        {
+          "prospect": "We've mostly been doing it manually. It's been a lot.",
+          "say_this": "Yeah I hear that a lot. How many pages and documents are we talking about roughly?"
+        },
+        {
+          "prospect": "I'm not sure, probably a few thousand pages and a ton of PDFs.",
+          "say_this": "Makes sense. And are you guys remediating those PDFs one by one, or do you have something automated for that?"
+        },
+        {
+          "prospect": "We have an overlay widget on the site.",
+          "say_this": "OK so like an AudioEye or UserWay type thing? How has that been working with the Title II requirements?"
+        }
+      ]
+    },
+    {
+      "id": "PITCH",
+      "order": 5,
+      "name": "Pitch",
+      "goal": "Present EqualGround as the solution to the specific gaps uncovered in discovery.",
+      "word_limit": 45,
+      "transition_to": "CTA",
+      "transition_triggers": [
+        "prospect shows interest or asks for more info",
+        "prospect asks about pricing",
+        "prospect asks about next steps",
+        "you have delivered the core value prop"
+      ],
+      "instructions": "Connect EqualGround directly to the pain they described. Lead with the gap you found — if they struggle with PDFs, lead with deep PDF remediation. If they use an overlay, lead with source-code-level fixes. Keep it concise. Do NOT dump every feature. Hit the one or two things that matter to THIS prospect. Position EqualGround as the direct answer to what they just told you.",
+      "few_shot": [
+        {
+          "prospect": "So what exactly does your platform do?",
+          "say_this": "So EqualGround scans your entire digital footprint — CMS, websites, documents, apps — and auto-remediates accessibility issues at the source code level. The big differentiator is our Autopilot feature fixes things automatically instead of flagging them for you to fix manually."
+        },
+        {
+          "prospect": "We have thousands of PDFs that are a nightmare.",
+          "say_this": "That's actually our strongest area. Most tools just scan web text but can't touch PDFs. EqualGround does deep PDF remediation — scans, tags, and fixes them so screen readers can actually process them. That's usually the biggest gap we see."
+        },
+        {
+          "prospect": "How is that different from AudioEye?",
+          "say_this": "AudioEye is an overlay — it sits on top of your site but doesn't change the underlying code. The DOJ has actually said overlays don't guarantee compliance. EqualGround fixes the root source code and handles your PDFs, which overlays can't do."
+        }
+      ]
+    },
+    {
+      "id": "CTA",
+      "order": 6,
+      "name": "Call to Action",
+      "goal": "Book a 30-minute Zoom demo. Get a specific date and time.",
+      "word_limit": 45,
+      "transition_to": null,
+      "transition_triggers": [],
+      "instructions": "Transition naturally from the pitch. Frame the Zoom as low-pressure — you will share your screen, walk through how EqualGround helps institutions like theirs, and also learn about their setup. Ask for a specific time. If they push back, use REMOVE PRESSURE — agree it is not a commitment, just a conversation. If they say no budget, acknowledge it and frame the demo as getting them informed for when budget opens.",
+      "few_shot": [
+        {
+          "prospect": "That sounds interesting. What would next steps look like?",
+          "say_this": "Main reason I'm reaching out is just to see if it makes sense to connect over Zoom for about 30 minutes. I'd share my screen, walk you through how EqualGround is helping other institutions, and get a sense of your setup. Does sometime this week or next work?"
+        },
+        {
+          "prospect": "I'd have to check my calendar.",
+          "say_this": "Totally get it. Would it be easiest if I sent over a couple time options? What does your Thursday or Friday look like?"
+        },
+        {
+          "prospect": "I'm not sure we have budget for anything right now.",
+          "say_this": "Totally fair. This wouldn't be a budget conversation — more just getting you up to speed on what's out there before the April deadline hits. Even if it's just 20 minutes. Any day work better for you?"
+        },
+        {
+          "prospect": "Send me an email and I'll take a look.",
+          "say_this": "Happy to. What's the best email? And would it help if I included the scan results from your site so you can see what we flagged?"
+        }
+      ]
+    }
+  ],
+  "stage_flow_rules": {
+    "enforce_milestones": true,
+    "required_order": ["GATEKEEPER", "INTRO", "CREDIBILITY", "DISCOVERY", "PITCH", "CTA"],
+    "skip_allowed": {
+      "GATEKEEPER": true,
+      "INTRO": false,
+      "CREDIBILITY": false,
+      "DISCOVERY": false,
+      "PITCH": false,
+      "CTA": false
+    },
+    "skip_note": "GATEKEEPER can be skipped if the rep already reached the right person. All other stages must be hit in order."
+  }
+}

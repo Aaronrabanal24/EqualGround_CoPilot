@@ -1,0 +1,38 @@
+{
+  "company": {
+    "name": "YuJa EqualGround",
+    "parent": "YuJa",
+    "category": "Enterprise Digital Accessibility Platform",
+    "markets": ["K-12 Education", "Higher Education", "State Government", "Local Government", "County Government"],
+    "elevator_pitch": "EqualGround is an enterprise-grade digital accessibility platform that automates the discovery and remediation of accessibility issues to ensure ADA and WCAG compliance — protecting institutions from DOJ lawsuits."
+  },
+  "unique_selling_points": {
+    "source_code_remediation": "We don't just flag problems — we fix them at the source code level. Most tools scan and report. EqualGround scans and fixes.",
+    "deep_pdf_remediation": "We are the industry leader in Deep PDF Remediation. Public sector sites have thousands of inaccessible PDFs — city council minutes, school board agendas, forms. EqualGround automatically scans, tags, and fixes these PDFs so screen readers can process them. Most competitors cannot touch PDFs.",
+    "autopilot": "Our Autopilot feature automatically remediates accessibility errors without manual intervention. Unlike competitors where you have to fix every issue by hand, Autopilot does the heavy lifting.",
+    "full_digital_footprint": "Scans CMS, websites, documents, PDFs, and applications — not just web pages."
+  },
+  "title_ii_compliance": {
+    "regulation": "DOJ updated ADA Title II requiring all state/local government and public education websites and apps to meet WCAG 2.1 Level AA.",
+    "deadline_large": "April 24, 2026 — entities with populations over 50,000",
+    "deadline_small": "April 2027 — entities with populations under 50,000",
+    "consequences": [
+      "Civil rights lawsuits",
+      "DOJ investigations",
+      "Loss of federal funding",
+      "Public complaints filed with Office of Civil Rights"
+    ],
+    "urgency_note": "The April 2026 deadline is imminent. Most entities are not fully compliant. This is the primary urgency lever."
+  },
+  "pricing": {
+    "model": "Based on total scope — web pages and documents (PDFs) across their digital footprint.",
+    "talk_track": "Our pricing maps directly to your actual scope — total page count and document volume. We do a quick scan of your footprint and tier it so you only pay for what you need.",
+    "if_pushed": "Offer to do a quick scan of their footprint to scope it and provide a tailored quote. Do NOT quote numbers on the phone.",
+    "anchor": "Position against cost of a DOJ lawsuit. A single complaint costs more to defend than a year of EqualGround."
+  },
+  "demo_offer": {
+    "format": "30-minute Zoom call",
+    "what_happens": "Share screen, walk through how EqualGround is helping similar institutions, show their specific scan results, learn about their setup.",
+    "positioning": "Low-pressure. Not a sales pitch — a knowledge-sharing conversation. Frame as 'seeing if it makes sense' not 'buying something'."
+  }
+}

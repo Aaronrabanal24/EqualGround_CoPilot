@@ -1,0 +1,58 @@
+{
+  "personas": {
+    "it_director_webmaster": {
+      "titles": ["IT Director", "Webmaster", "Web Developer", "Web Administrator", "Digital Services Manager", "IT Manager"],
+      "trigger_phrases": ["IT", "webmaster", "developer", "I manage the website", "I handle the tech", "web team"],
+      "theme": "Time, manual labor, technical debt, tool fatigue",
+      "pain_points": [
+        "Manual remediation eating up staff time",
+        "Too many tools and not enough integration",
+        "New content breaking compliance as fast as they fix it",
+        "No bandwidth for PDF backlog"
+      ],
+      "discovery_questions": [
+        "How much of your team's time is going into accessibility remediation right now?",
+        "Are you fixing things manually or do you have something automated?",
+        "What's the PDF situation look like — are those being handled too?",
+        "How does your current tool integrate with your CMS?"
+      ],
+      "pivot_to": "Auto-Remediation and CMS integrations. Emphasize that EqualGround removes the manual burden and plugs directly into their existing stack."
+    },
+    "compliance_officer": {
+      "titles": ["Compliance Officer", "Accessibility Coordinator", "ADA Coordinator", "504 Coordinator", "Civil Rights Officer", "Accessibility Director"],
+      "trigger_phrases": ["compliance", "accessibility coordinator", "ADA coordinator", "504", "civil rights", "audit"],
+      "theme": "Audit readiness, tracking progress, fear of non-compliance, documentation",
+      "pain_points": [
+        "Lack of visibility into current compliance status",
+        "No audit trail or reporting for leadership",
+        "Can't prove compliance to DOJ if investigated",
+        "No centralized dashboard across all digital properties"
+      ],
+      "discovery_questions": [
+        "Do you have visibility right now into where you stand compliance-wise?",
+        "If the DOJ came knocking tomorrow, could you show them a compliance report?",
+        "Are you tracking remediation progress anywhere, or is it more ad hoc?",
+        "Who else is involved in the compliance decision — IT, legal?"
+      ],
+      "pivot_to": "Executive Reporting and Audit-ready dashboards. Emphasize EqualGround generates compliance reports they can hand to leadership or DOJ."
+    },
+    "superintendent_city_manager": {
+      "titles": ["Superintendent", "City Manager", "County Manager", "County Administrator", "Town Manager", "Assistant Superintendent"],
+      "trigger_phrases": ["superintendent", "city manager", "county manager", "budget", "board", "council", "risk", "liability"],
+      "theme": "Budget efficiency, risk mitigation, avoiding DOJ lawsuits, leadership accountability",
+      "pain_points": [
+        "Fear of DOJ lawsuit or investigation",
+        "Budget constraints but can't afford non-compliance",
+        "Need to show the board/council they're taking action",
+        "Don't understand the technical details but know it's a risk"
+      ],
+      "discovery_questions": [
+        "Is this something that's come up at the board or council level yet?",
+        "What's the bigger concern right now — the budget side or the compliance risk side?",
+        "Has anyone in your area been hit with a DOJ complaint or lawsuit on this?",
+        "Who on your team is closest to the technical side of this?"
+      ],
+      "pivot_to": "Cost of a DOJ lawsuit vs. cost of proactive compliance. Emphasize risk mitigation and that EqualGround is a fraction of the cost of a single lawsuit."
+    }
+  }
+}

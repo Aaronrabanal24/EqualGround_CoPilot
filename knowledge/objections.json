@@ -1,0 +1,74 @@
+{
+  "objections": {
+    "no_budget": {
+      "trigger_phrases": ["no budget", "not in the budget", "can't afford", "cant afford", "budget is tight", "no money", "budget cycle", "already spent our budget", "not a priority right now", "don't have budget", "do not have budget", "don't have the budget", "no funding", "not funded", "budget doesn't allow", "don't have any budget", "have any budget", "afford"],
+      "tactic": "REMOVE PRESSURE",
+      "instructions": "Agree that today is not about budget. Pivot to Title II urgency. Position the demo as knowledge-gathering for when budget opens. Emphasize the cost of a lawsuit is 10-100x the cost of a solution.",
+      "example_responses": [
+        "Totally fair. This wouldn't be a budget conversation — more just getting you up to speed on what's out there before the deadline hits. Even 20 minutes.",
+        "Makes sense. But just to put it in perspective — a single DOJ complaint costs more to defend than a year of compliance tooling. Might be worth at least seeing what's out there.",
+        "Understood. When does your next budget cycle open? Might make sense to at least have a conversation now so you're ready when it does."
+      ]
+    },
+    "already_compliant": {
+      "trigger_phrases": ["we're already compliant", "we already handle that", "we're good", "we passed our audit", "we're covered"],
+      "tactic": "CONSULTATIVE GAP FINDING",
+      "instructions": "Don't argue. Acknowledge. Then probe for PDFs specifically — that's almost always the gap. Ask about their document library, not just the web pages.",
+      "example_responses": [
+        "That's great. Are you covering the document side too — PDFs, board minutes, agendas? That's usually where we see the gap.",
+        "Good to hear. When was the last time you ran a full scan against WCAG 2.1 AA? The Title II updates added some new requirements.",
+        "Nice. Is your compliance covering just the main site, or are you scanning subdomains and third-party apps too?"
+      ]
+    },
+    "website_redesign": {
+      "trigger_phrases": ["redesign", "new website", "rebuilding", "migration", "launching a new site", "switching platforms", "redesigning"],
+      "tactic": "PIVOT TO TIMING",
+      "instructions": "Frame this as perfect timing. It's much easier and cheaper to build accessibility in during a redesign than to retrofit later. Ask who is handling the redesign.",
+      "example_responses": [
+        "Perfect timing actually. It's way easier to build accessibility in during the redesign than to bolt it on after. Who's handling the build?",
+        "That's actually ideal. A lot of our customers time EqualGround with their redesign so the new site launches fully compliant from day one. Who's the vendor?",
+        "Smart. So the question is — is the new site being built to Title II standards, or are you planning to address that separately?"
+      ]
+    },
+    "using_competitor": {
+      "trigger_phrases": ["we already use", "we have a tool", "we're using", "we went with", "we signed with"],
+      "tactic": "CONSULTATIVE GAP FINDING",
+      "instructions": "Don't bash the competitor directly. Ask how it's working for them. Probe for gaps — especially PDFs, automation, and whether the tool flags vs. fixes. Use the relevant battlecard from battlecards.json.",
+      "example_responses": [
+        "Got it. How's it been working for you? Is it catching everything, or are there areas where you're still doing manual work?",
+        "OK. And does it handle your PDFs and documents too, or mainly just the web pages?",
+        "When you say you're using it — is it scanning and flagging, or is it actually remediating the issues for you?"
+      ]
+    },
+    "send_email": {
+      "trigger_phrases": ["send me an email", "email me", "send me info", "send me something", "put it in an email"],
+      "tactic": "AGREE AND ANCHOR",
+      "instructions": "Always agree to send an email. But before hanging up, anchor a follow-up: offer to include the scan results and ask for a specific follow-up time.",
+      "example_responses": [
+        "Happy to. What's the best email? And would it help if I included the scan results from your site so you can see what we flagged?",
+        "Sure thing. I'll send that over. Would it make sense to block 15 minutes later this week to walk through what I send? That way I can answer questions live.",
+        "Absolutely. I'll put together the scan results and a quick overview. What's a good email, and is there a day this week I could follow up?"
+      ]
+    },
+    "not_my_decision": {
+      "trigger_phrases": ["not my decision", "have to check with", "need to talk to my boss", "need approval", "someone else decides", "I'd need to run it by"],
+      "tactic": "MAP THE BUYING COMMITTEE",
+      "instructions": "Ask who else is involved. Offer to include them on the demo. Position yourself as helping the prospect build the internal case.",
+      "example_responses": [
+        "Totally get it. Who else would need to be in the conversation for this to move forward?",
+        "Makes sense. Would it help if I set up the Zoom so they could join too? Sometimes it's easier to make the case with a live walkthrough.",
+        "Understood. Would it help if I put together a one-pager you could share with them? Or would it be better to just loop them into a quick call?"
+      ]
+    },
+    "too_busy": {
+      "trigger_phrases": ["really busy", "bad time", "swamped", "not a good time", "crazy week", "in the middle of something"],
+      "tactic": "RESPECT AND REBOOK",
+      "instructions": "Respect their time immediately. Offer a very specific alternative time. Keep it to 15/ 20 minutes. Make it easy to say yes.",
+      "example_responses": [
+        "Totally get it. I'll keep this quick — would 15 minutes later this week be easier? I just want to share what the scan found on your site.",
+        "No worries at all. When would be a better time? I'm flexible — even a 10-minute call works.",
+        "Understood. Could I call you back Thursday afternoon? It'll be quick — just want to share the scan results."
+      ]
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "competitors": {
+    "overlay": {
+      "names": ["AudioEye", "UserWay", "AccessiBe", "EqualWeb"],
+      "trigger_phrases": ["overlay", "widget", "audioeye", "userway", "accessibe", "equalweb", "plugin", "toolbar"],
+      "their_flaw": "Overlays do NOT change source code. The DOJ has explicitly stated overlays do not guarantee compliance. They are a cosmetic layer that sits on top — the underlying code is still broken. Plaintiff attorneys actively target sites with overlays because it shows awareness without action.",
+      "our_pivot": "Widgets actually act as a beacon for lawsuits. EqualGround fixes the root code and handles your PDFs — overlays can't touch PDFs.",
+      "example_responses": [
+        "So overlays like AudioEye sit on top of your site but don't actually change the underlying code. The DOJ has said that doesn't count. Are you seeing it catch everything, or are there gaps?",
+        "Yeah a lot of folks start with an overlay. The issue is it doesn't fix PDFs and the DOJ doesn't consider it compliant. How's it been working for the document side of things?",
+        "Got it. So the challenge with widgets is they don't remediate at the source level. EqualGround actually fixes the code and auto-remediates PDFs, which is usually the biggest gap."
+      ]
+    },
+    "civicplus_granicus": {
+      "names": ["CivicPlus", "Granicus", "CivicEngage"],
+      "trigger_phrases": ["civicplus", "granicus", "civicengage", "website builder", "website vendor", "cms vendor", "our website company"],
+      "their_flaw": "Great at building and hosting government websites, but terrible at parsing and remediating historical PDFs. They build the house but don't clean the closets.",
+      "our_pivot": "Great for hosting. Most folks actually use EqualGround alongside them — CivicPlus handles the site, EqualGround handles the heavy lifting on PDF remediation and deep compliance.",
+      "example_responses": [
+        "CivicPlus is solid for the site itself. Most of our customers actually use us alongside them — CivicPlus handles the hosting and EqualGround handles the PDF remediation and deep scan. Are they covering the document side for you?",
+        "Yeah Granicus does a great job on the web side. The gap we usually see is with the thousands of historical PDFs that need to be tagged and remediated. Is that something they're handling for you?",
+        "Good. So the way most counties set it up is CivicPlus runs the site and EqualGround sits behind it scanning and fixing the underlying accessibility issues. Especially the document backlog."
+      ]
+    },
+    "siteimprove": {
+      "names": ["Siteimprove"],
+      "trigger_phrases": ["siteimprove", "site improve"],
+      "their_flaw": "Bloated, overpriced SEO tool that bolted on accessibility. Designed for enterprise marketing teams, not government compliance officers. You're paying for SEO, analytics, and content features you'll never touch.",
+      "our_pivot": "If you just need to pass Title II without paying for a bunch of SEO features you won't use, EqualGround is the direct answer. Purpose-built for compliance.",
+      "example_responses": [
+        "Siteimprove is a big platform. How much of it are you actually using — is it mostly accessibility, or are you using their SEO and analytics stuff too?",
+        "Got it. So the feedback we hear is folks are paying for a ton of features they're not using. If you're mainly focused on Title II compliance, EqualGround is purpose-built just for that. And it handles PDFs natively.",
+        "Yeah Siteimprove flags things but you still have to fix them manually. EqualGround auto-remediates, so you're not adding more work to your team's plate."
+      ]
+    },
+    "manual_inhouse": {
+      "names": ["manual", "in-house", "staff"],
+      "trigger_phrases": ["doing it ourselves", "our team handles", "manually", "in-house", "our developer", "our web person", "we fix them ourselves"],
+      "their_flaw": "Manual remediation does not scale. A single web person cannot keep up with thousands of pages and PDFs that are constantly being added and updated. It's a bottomless pit of work.",
+      "our_pivot": "Manual works for a handful of pages. The challenge is when you have thousands of documents and the compliance clock is ticking. EqualGround automates the heavy lifting so your team can focus on the work that actually needs a human.",
+      "example_responses": [
+        "How many pages and documents are we talking about? And is it one person or a team handling it?",
+        "Yeah that's what we hear a lot. One person trying to keep up with thousands of pages and new content being added every week. How are they prioritizing what to fix first?",
+        "Makes sense. So EqualGround basically automates the part that's eating up their time — the scanning, tagging, and fixing. That way your team can focus on the stuff that actually needs a human touch."
+      ]
+    }
+  }
+}

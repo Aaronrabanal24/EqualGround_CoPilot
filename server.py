@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -11,98 +12,218 @@ app = FastAPI()
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ---------------------------------------------------------
-# THE MASTER CONSULTATIVE PROMPT
+# LOAD KNOWLEDGE BASE FROM FILES
 # ---------------------------------------------------------
-SYSTEM_PROMPT = """You are an elite, consultative Sales Copilot for a YuJa EqualGround Account Executive.
-Your ONLY goal is to analyze the live transcript, act as a business problem-solver, and feed the sales rep the exact next sentence to say to keep the prospect talking.
+KB_DIR = Path(__file__).parent / "knowledge"
 
-You are NOT a message reader. You are a DYNAMIC FRAMEWORK designed to facilitate a two-way collaborative discussion, uncover pain, and convert. You are ONLY listening to the PROSPECT'S audio.
+def _load_kb(filename: str) -> dict:
+    with open(KB_DIR / filename, "r") as f:
+        return json.load(f)
 
-===== MASTER KNOWLEDGE BASE =====
+KB_STAGES    = _load_kb("call_stages.json")
+KB_BATTLES   = _load_kb("battlecards.json")
+KB_PERSONAS  = _load_kb("personas.json")
+KB_OBJECTIONS = _load_kb("objections.json")
+KB_PRODUCT   = _load_kb("product.json")
 
-CORE IDENTITY & ELEVATOR PITCH:
-- EqualGround is an enterprise-grade digital accessibility platform for education (K-12/Higher Ed) and government.
-- We automate the discovery AND remediation of digital accessibility issues to ensure total ADA and WCAG compliance, protecting institutions from DOJ lawsuits.
+# Build fast lookup maps
+STAGES_BY_ID = {s["id"]: s for s in KB_STAGES["stages"]}
+STAGE_ORDER  = [s["id"] for s in KB_STAGES["stages"]]
 
-UNIQUE SELLING FEATURE (THE "SILVER BULLET"):
-- We don't just flag problems — we actually fix them at the source code level.
-- We are the undisputed industry leader in Deep PDF Remediation.
-- Most competitors only scan web text. Public sector sites are cemeteries for thousands of inaccessible PDFs (city council minutes, school board agendas, forms). EqualGround automatically scans, tags, and fixes these PDFs so screen readers can process them.
+# ---------------------------------------------------------
+# KEYWORD DETECTION HELPERS
+# ---------------------------------------------------------
+def _text_matches(text: str, phrases: list[str]) -> bool:
+    """Check if any trigger phrase appears in the text (case-insensitive)."""
+    lower = text.lower()
+    return any(p.lower() in lower for p in phrases)
 
-TITLE II COMPLIANCE — CRITICAL DEADLINE:
-- The DOJ updated ADA Title II regulations requiring all state/local government and public education websites/apps to meet WCAG 2.1 Level AA.
-- Entities with populations over 50,000: deadline is April 24, 2026 (IMMINENT).
-- Smaller entities: deadline is April 2027.
-- Consequence: Immediate exposure to civil rights lawsuits, DOJ investigations, and loss of federal funding.
-- Urgency Tactic: "The DOJ deadline is officially here. Are you fully compliant today, or are you exposed?"
 
-COMPETITOR BATTLECARDS:
-1. vs. Overlays (AudioEye, UserWay, AccessiBe):
-   - Their Flaw: Overlays DO NOT change source code. The DOJ has explicitly stated overlays do not guarantee compliance. They are a liability.
-   - Our Pivot: "Widgets actually act as a beacon for lawsuits. EqualGround fixes the root code and handles your PDFs."
-2. vs. CivicPlus / Granicus (Website Builders):
-   - Their Flaw: Great at building sites, terrible at parsing historical PDFs.
-   - Our Pivot: "Great for hosting, but most folks use EqualGround alongside them for the heavy lifting on PDF remediation."
-3. vs. Siteimprove:
-   - Their Flaw: Bloated, overpriced SEO tool masquerading as a compliance tool.
-   - Our Pivot: "If you just need to pass Title II without paying for bloated SEO features you won't use, we are the direct answer."
+def detect_competitor(text: str) -> dict | None:
+    """Return the matching battlecard if a competitor is mentioned."""
+    for key, card in KB_BATTLES["competitors"].items():
+        if _text_matches(text, card["trigger_phrases"]):
+            return card
+    return None
 
-BUYER PERSONAS & DISCOVERY THEMES (adapt dynamically, never read verbatim):
-1. IT Directors / Webmasters:
-   - Theme: Time, manual labor, technical debt, tool fatigue.
-   - If they mention manual work -> pivot to Auto-Remediation and CMS integrations.
-2. Compliance / Accessibility Officers:
-   - Theme: Audit readiness, tracking progress, fear of non-compliance.
-   - If they mention lack of visibility -> pivot to Executive Reporting and Audit-ready dashboards.
-3. Superintendents / City Managers:
-   - Theme: Budget efficiency, risk mitigation, avoiding DOJ lawsuits.
-   - If they mention budget constraints -> pivot to cost of a DOJ lawsuit vs. cost of proactive compliance.
 
-PRICING GUIDELINES:
-- Pricing is based on total scope of web pages and documents (PDFs) across their digital footprint.
-- If pushed on price: "Our pricing maps directly to your actual scope — total page count and document volume. We do a quick scan of your footprint and tier it so you only pay for what you need. Open to doing a quick scan?"
+def detect_objection(text: str) -> dict | None:
+    """Return the matching objection playbook entry."""
+    for key, obj in KB_OBJECTIONS["objections"].items():
+        if _text_matches(text, obj["trigger_phrases"]):
+            return obj
+    return None
 
-===== DYNAMIC PLAYBOOK =====
 
-1. IF PROSPECT GIVES A COLD/SHORT ANSWER:
-   -> Tactic: PEEL THE ONION
-   -> Acknowledge, then ask an open-ended question.
-2. IF PROSPECT ASKS A DIRECT QUESTION:
-   -> Tactic: ANSWER THEN DEFLECT
-   -> Brief 1-sentence answer, then immediately hand the mic back.
-3. IF PROSPECT SAYS "We are doing a website redesign":
-   -> Tactic: PIVOT TO TIMING
-   -> "Perfect timing. It's actually much easier to build accessibility in during the redesign. Who is handling that?"
-4. IF PROSPECT SAYS "We already use a competitor":
-   -> Tactic: CONSULTATIVE GAP FINDING
-   -> Use the relevant battlecard above, then probe their PDF workflow.
-5. IF PROSPECT SAYS "No budget":
-   -> Tactic: REMOVE PRESSURE
-   -> Agree today isn't about budget. Pivot to Title II urgency. Position demo as knowledge for when budget opens.
-6. IF PROSPECT MENTIONS PRICING:
-   -> Tactic: SCOPE THE FOOTPRINT
-   -> Use pricing talk track above. Offer the quick scan.
+def detect_persona(text: str) -> dict | None:
+    """Return the matching buyer persona."""
+    for key, persona in KB_PERSONAS["personas"].items():
+        if _text_matches(text, persona["trigger_phrases"]):
+            return persona
+    return None
 
-===== TONE AND VOICE GUARDRAILS (CRITICAL) =====
 
-1. Write exactly how human beings speak, not how they write.
-2. Use fragments. Start sentences with "So," "But," or "Look."
-3. NEVER use generic AI words like: "delve", "elevate", "navigate", "robust", "seamless", "synergy", or "ensure".
-4. Do not be overly enthusiastic. No exclamation points. Act calm, slightly detached, and authoritative.
-5. Bad Example: "I completely understand your concern! However, our platform offers a robust solution for that."
-6. Good Example: "Makes sense. But how are you guys actually handling the Title II stuff right now?"
+# ---------------------------------------------------------
+# DYNAMIC PROMPT BUILDER
+# ---------------------------------------------------------
+def build_system_prompt(stage_id: str, recent_text: str, call_history: list) -> str:
+    """Compose a focused system prompt based on current call stage and context."""
 
-===== CRITICAL RULES FOR OUTPUT =====
+    stage = STAGES_BY_ID.get(stage_id, STAGES_BY_ID["GATEKEEPER"])
+    product = KB_PRODUCT
 
-1. The rep is reading your output LIVE on a teleprompter.
-2. The 'say_this' field MUST be conversational, direct, and STRICTLY UNDER 15 WORDS. Zero fluff.
-3. You must respond ONLY with this exact JSON structure:
-{
-  "stage": "Identify stage (e.g., Hook, Discovery, Objection)",
-  "tactic": "SHORT UPPERCASE ACTION (e.g., PEEL THE ONION)",
-  "say_this": "The exact sentence to read out loud",
-  "objection_label": "Short objection label if one was raised, otherwise null"
-}"""
+    # --- CORE IDENTITY (always included, ~200 tokens) ---
+    core = f"""You are an elite, consultative Sales Copilot for a YuJa EqualGround Account Executive.
+Your ONLY goal is to analyze the prospect's live speech and feed the sales rep the exact next sentence to say.
+
+You are ONLY hearing the PROSPECT'S audio. The rep reads your output on a teleprompter — it must sound natural when spoken aloud.
+
+PRODUCT: {product['company']['elevator_pitch']}
+KEY DIFFERENTIATORS:
+- {product['unique_selling_points']['source_code_remediation']}
+- {product['unique_selling_points']['deep_pdf_remediation']}
+- {product['unique_selling_points']['autopilot']}
+
+TITLE II DEADLINE: {product['title_ii_compliance']['deadline_large']} for entities over 50k population. {product['title_ii_compliance']['deadline_small']} for smaller entities. Non-compliance means DOJ lawsuits, investigations, and loss of federal funding."""
+
+    # --- CURRENT STAGE INSTRUCTIONS (always included) ---
+    stage_section = f"""
+===== CURRENT CALL STAGE: {stage['name']} ({stage['order']}/6) =====
+GOAL: {stage['goal']}
+INSTRUCTIONS: {stage['instructions']}
+WORD LIMIT: Your 'say_this' MUST be under {stage['word_limit']} words. This is critical — the rep reads it live.
+
+EXAMPLE DIALOGUE FOR THIS STAGE:"""
+    for ex in stage["few_shot"]:
+        stage_section += f"""
+  Prospect: "{ex['prospect']}"
+  -> say_this: "{ex['say_this']}" """
+
+    # --- STAGE TRANSITION RULES ---
+    next_stage_name = STAGES_BY_ID[stage["transition_to"]]["name"] if stage["transition_to"] else "N/A (final stage)"
+    stage_section += f"""
+
+STAGE TRANSITION: Move to '{next_stage_name}' when ANY of these happen:"""
+    for trigger in stage.get("transition_triggers", []):
+        stage_section += f"\n  - {trigger}"
+    stage_section += f"""
+If you detect a transition, set 'stage' to '{stage.get('transition_to', stage_id)}' in your response. Otherwise keep 'stage' as '{stage_id}'."""
+
+    # --- CONTEXTUAL MODULES (loaded on demand) ---
+    context_modules = ""
+
+    # Competitor battlecard — only if competitor mentioned
+    competitor = detect_competitor(recent_text)
+    if competitor:
+        context_modules += f"""
+
+===== COMPETITOR DETECTED =====
+THEIR FLAW: {competitor['their_flaw']}
+OUR PIVOT: {competitor['our_pivot']}
+EXAMPLE RESPONSES:"""
+        for resp in competitor["example_responses"][:2]:
+            context_modules += f'\n  - "{resp}"'
+
+    # Objection playbook — only if objection detected
+    objection = detect_objection(recent_text)
+    if objection:
+        context_modules += f"""
+
+===== OBJECTION DETECTED =====
+TACTIC: {objection['tactic']}
+INSTRUCTIONS: {objection['instructions']}
+EXAMPLE RESPONSES:"""
+        for resp in objection["example_responses"][:2]:
+            context_modules += f'\n  - "{resp}"'
+
+    # Persona info — only if persona detected
+    persona = detect_persona(recent_text)
+    if persona:
+        context_modules += f"""
+
+===== BUYER PERSONA DETECTED =====
+THEME: {persona['theme']}
+PIVOT TO: {persona['pivot_to']}
+DISCOVERY QUESTIONS TO ASK:"""
+        for q in persona["discovery_questions"][:2]:
+            context_modules += f'\n  - "{q}"'
+
+    # --- PRICING (only in PITCH or CTA stages) ---
+    pricing_section = ""
+    if stage_id in ("PITCH", "CTA"):
+        pricing_section = f"""
+
+===== PRICING (if asked) =====
+{product['pricing']['talk_track']}
+If pushed: {product['pricing']['if_pushed']}
+Anchor: {product['pricing']['anchor']}"""
+
+    # --- TONE GUARDRAILS (always included) ---
+    tone = """
+
+===== TONE GUARDRAILS (CRITICAL) =====
+1. Write exactly how a human talks on the phone. Use fragments. Start sentences with "So," "But," "Look," "Yeah."
+2. NEVER use: "delve", "elevate", "navigate", "robust", "seamless", "synergy", "ensure", "leverage", "streamline".
+3. No exclamation points. Calm, slightly detached, authoritative. You are a peer, not a salesperson.
+4. BAD: "I completely understand your concern! Our platform offers a robust solution."
+5. GOOD: "Makes sense. But how are you guys actually handling the Title II stuff right now?"
+6. Match the prospect's energy. If they are brief, you are brief. If they open up, you can expand slightly."""
+
+    # --- OUTPUT FORMAT (always included) ---
+    stage_idx = STAGE_ORDER.index(stage_id) + 1 if stage_id in STAGE_ORDER else 1
+    next_milestone = stage["goal"]
+    output_rules = f"""
+
+===== OUTPUT FORMAT =====
+Respond ONLY with this JSON — nothing else:
+{{
+  "stage": "{stage_id}",
+  "tactic": "SHORT UPPERCASE TACTIC NAME",
+  "say_this": "The exact sentence the rep should say out loud (UNDER {stage['word_limit']} WORDS)",
+  "objection_label": "short objection label OR null",
+  "next_milestone": "What the rep should aim for next in one short sentence",
+  "stage_progress": "{stage_idx}/6"
+}}
+
+RULES:
+- 'say_this' MUST be under {stage['word_limit']} words. Count them.
+- 'say_this' must sound natural when read aloud on a teleprompter.
+- If the prospect raises an objection, handle it with the appropriate tactic AND set objection_label.
+- Update 'stage' ONLY when a transition trigger is met. Do not skip stages.
+- 'next_milestone' should tell the rep what to aim for next (e.g., "Confirm they handle accessibility", "Get them to mention their current tool")."""
+
+    return core + stage_section + context_modules + pricing_section + tone + output_rules
+
+
+# ---------------------------------------------------------
+# SMART CONTEXT WINDOW
+# ---------------------------------------------------------
+def build_context_window(call_history: list) -> list:
+    """Keep first 3 messages (intro context) + last 15 messages (recent context).
+    This prevents losing who the DM is, their name, and role."""
+    if len(call_history) <= 18:
+        return list(call_history)
+    return call_history[:3] + call_history[-15:]
+
+
+# ---------------------------------------------------------
+# STAGE ADVANCEMENT
+# ---------------------------------------------------------
+def advance_stage(current_stage: str, ai_stage: str) -> str:
+    """Only allow forward stage movement (no skipping back)."""
+    if ai_stage not in STAGE_ORDER:
+        return current_stage
+    current_idx = STAGE_ORDER.index(current_stage) if current_stage in STAGE_ORDER else 0
+    ai_idx = STAGE_ORDER.index(ai_stage)
+    # Allow moving forward by 1 stage, or staying
+    if ai_idx == current_idx or ai_idx == current_idx + 1:
+        return ai_stage
+    # If AI tries to skip ahead, only advance by 1
+    if ai_idx > current_idx + 1:
+        return STAGE_ORDER[current_idx + 1]
+    # Don't go backwards
+    return current_stage
+
 
 # ---------------------------------------------------------
 # HEALTH CHECK ENDPOINT
@@ -111,25 +232,28 @@ PRICING GUIDELINES:
 async def root():
     return {"status": "EqualGround AI Copilot Engine is Live and Running!"}
 
+
 # ---------------------------------------------------------
 # WEBSOCKET REAL-TIME ENGINE
 # ---------------------------------------------------------
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
     await websocket.accept()
-    call_history = []
-    current_stage = "Gatekeeper"
-    current_script = "Hi. Who handles your website accessibility and WCAG compliance?"
+    call_history: list[dict] = []
+    current_stage = "GATEKEEPER"
     print("Client connected to WebSocket")
 
     try:
-        # Send initial STATUS GUIDANCE instead of a template
+        # Send initial guidance
+        stage = STAGES_BY_ID[current_stage]
         await websocket.send_json({
             "type": "navigation",
-            "stage": "System Live",
-            "tactic": "AUDIO ROUTED",
-            "say_this": "🟢 AI Copilot is connected and listening for the prospect...",
+            "stage": current_stage,
+            "tactic": "READY",
+            "say_this": stage["few_shot"][0]["say_this"],
             "objection_label": None,
+            "next_milestone": stage["goal"],
+            "stage_progress": "1/6",
         })
 
         async for message in websocket.iter_text():
@@ -139,7 +263,16 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             if data.get("type") == "end_call":
                 print("Generating post-call summary using gpt-4o...")
 
-                summary_prompt = "Based on this call history, generate a CRM-ready summary with 3 bullet points: Pain Points, Objections Raised, and Recommended Next Steps."
+                summary_prompt = (
+                    "Based on this call history, generate a CRM-ready summary with these sections:\n"
+                    "1. **Call Outcome**: One sentence — did we book a meeting, get a follow-up, or get rejected?\n"
+                    "2. **Prospect Info**: Name, title, organization (if mentioned)\n"
+                    "3. **Pain Points Uncovered**: Bullet points\n"
+                    "4. **Objections Raised**: Bullet points with how they were handled\n"
+                    "5. **Competitor Mentioned**: If any\n"
+                    "6. **Recommended Next Steps**: Specific actions with timeline\n"
+                    "7. **Call Stage Reached**: Which stage did the call get to?"
+                )
                 transcript_text = "\n".join(
                     f"{entry['role']}: {entry['content']}" for entry in call_history
                 )
@@ -149,14 +282,18 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                 ]
 
                 summary_response = await client.chat.completions.create(
-                    model="gpt-4o",  # The Heavyweight model for deep analysis
-                    messages=summary_messages
+                    model="gpt-4o",
+                    messages=summary_messages,
                 )
 
                 final_summary = summary_response.choices[0].message.content
 
-                # --- FORMAT THE RAW TRANSCRIPT ---
-                formatted_transcript = "\n\n=======================\nFULL TRANSCRIPT\n=======================\n\n"
+                # Format raw transcript
+                formatted_transcript = (
+                    "\n\n=======================\n"
+                    "FULL TRANSCRIPT\n"
+                    "=======================\n\n"
+                )
                 for entry in call_history:
                     if entry["role"] == "user":
                         formatted_transcript += f"PROSPECT: {entry['content']}\n\n"
@@ -169,11 +306,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                         except json.JSONDecodeError:
                             pass
 
-                combined_output = final_summary + formatted_transcript
-
                 await websocket.send_json({
                     "type": "summary",
-                    "text": combined_output,
+                    "text": final_summary + formatted_transcript,
                 })
                 break
 
@@ -183,50 +318,63 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                 if not user_text:
                     continue
 
-                print(f"Received from Microphone: {user_text}")
+                print(f"[{current_stage}] Prospect: {user_text}")
 
-                # Echo transcript back to the UI
+                # Echo transcript back to UI
                 await websocket.send_json({
                     "type": "transcript",
                     "speaker": "Prospect",
                     "text": user_text,
                 })
 
-                # Log the prospect's speech
+                # Log prospect's speech
                 call_history.append({"role": "user", "content": user_text})
 
-                # SLIDING WINDOW: Keep prompt + only the last 10 messages for speed
-                recent_context = call_history[-10:]
-                messages = [{"role": "system", "content": SYSTEM_PROMPT}] + recent_context
+                # Build stage-aware prompt + smart context window
+                system_prompt = build_system_prompt(current_stage, user_text, call_history)
+                context = build_context_window(call_history)
+                messages = [{"role": "system", "content": system_prompt}] + context
 
                 # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) ---
                 response = await client.chat.completions.create(
-                    model="gpt-4o-mini",  # The Lightweight model for split-second reflexes
+                    model="gpt-4o-mini",
                     messages=messages,
-                    response_format={"type": "json_object"}  # Strict JSON Lock
+                    response_format={"type": "json_object"},
                 )
 
                 ai_response_text = response.choices[0].message.content
 
-                # Log the AI's advice to the history
+                # Log AI advice to history
                 call_history.append({"role": "assistant", "content": ai_response_text})
 
-                # Parse the JSON response
+                # Parse JSON response
                 guidance = json.loads(ai_response_text)
                 if "objection_label" not in guidance:
                     guidance["objection_label"] = None
 
-                # Update running state
-                current_stage = guidance.get("stage", current_stage)
-                current_script = guidance.get("say_this", current_script)
+                # Advance stage (enforced: forward only, max 1 step)
+                ai_stage = guidance.get("stage", current_stage)
+                current_stage = advance_stage(current_stage, ai_stage)
+                guidance["stage"] = current_stage
 
-                # Push AI coaching back to the UI
+                # Fill in defaults for new fields
+                stage_idx = STAGE_ORDER.index(current_stage) + 1 if current_stage in STAGE_ORDER else 1
+                if "stage_progress" not in guidance:
+                    guidance["stage_progress"] = f"{stage_idx}/6"
+                if "next_milestone" not in guidance:
+                    guidance["next_milestone"] = STAGES_BY_ID[current_stage]["goal"]
+
+                print(f"  -> [{guidance['tactic']}] {guidance['say_this']}")
+
+                # Push to UI
                 await websocket.send_json({
                     "type": "navigation",
                     "stage": guidance["stage"],
                     "tactic": guidance.get("tactic", ""),
                     "say_this": guidance["say_this"],
                     "objection_label": guidance.get("objection_label"),
+                    "next_milestone": guidance.get("next_milestone", ""),
+                    "stage_progress": guidance.get("stage_progress", ""),
                 })
 
     except WebSocketDisconnect:

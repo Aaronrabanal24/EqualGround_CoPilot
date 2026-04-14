@@ -12,6 +12,8 @@ type Navigation = {
   tactic: string;
   say_this: string;
   objection_label: string | null;
+  next_milestone: string;
+  stage_progress: string;
 };
 
 type IncomingMessage =
@@ -26,6 +28,8 @@ type IncomingMessage =
       tactic: string;
       say_this: string;
       objection_label: string | null;
+      next_milestone: string;
+      stage_progress: string;
     }
   | {
       type: "summary";
@@ -41,6 +45,8 @@ export default function Home() {
     tactic: "",
     say_this: "Waiting for call guidance...",
     objection_label: null,
+    next_milestone: "",
+    stage_progress: "1/6",
   });
   const [isListening, setIsListening] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
@@ -49,9 +55,18 @@ export default function Home() {
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    const wsUrl = process.env.NODE_ENV === "production"
-      ? "wss://equalground-copilot.onrender.com/ws/ui"
-      : "ws://127.0.0.1:8000/ws/ui";
+    // In production, use the Render deployment URL.
+    // In dev, detect if we're in a Codespace (proxied via HTTPS) or truly local.
+    let wsUrl: string;
+    if (process.env.NODE_ENV === "production") {
+      wsUrl = "wss://equalground-copilot.onrender.com/ws/ui";
+    } else if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
+      // GitHub Codespaces: replace the frontend port with 8000 for the backend
+      const host = window.location.hostname.replace(/-\d+\./, "-8000.");
+      wsUrl = `wss://${host}/ws/ui`;
+    } else {
+      wsUrl = "ws://127.0.0.1:8000/ws/ui";
+    }
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -70,6 +85,8 @@ export default function Home() {
           tactic: data.tactic,
           say_this: data.say_this,
           objection_label: data.objection_label ?? null,
+          next_milestone: data.next_milestone ?? "",
+          stage_progress: data.stage_progress ?? "",
         });
       } else if (data.type === "summary") {
         setSummary(data.text);
@@ -228,37 +245,66 @@ export default function Home() {
 
       {/* RIGHT SIDE: Call Guide (Teleprompter) */}
       <div className="w-2/5 bg-slate-950 p-8 flex flex-col">
-        {/* Stage Pill — top right */}
-        <div className="flex items-center justify-end gap-3">
-          {navigation.objection_label && (
-            <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white animate-pulse">
-              {navigation.objection_label}
+        {/* Stage Progress Bar */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              Stage {navigation.stage_progress}
             </span>
-          )}
-          <span
-            className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white ${
-              navigation.stage.toLowerCase().includes("objection")
-                ? "bg-red-600"
-                : "bg-amber-600"
-            }`}
-          >
-            {navigation.stage}
-          </span>
+            <div className="flex items-center gap-3">
+              {navigation.objection_label && (
+                <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white animate-pulse">
+                  {navigation.objection_label}
+                </span>
+              )}
+              <span
+                className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white ${
+                  navigation.stage.toLowerCase().includes("objection")
+                    ? "bg-red-600"
+                    : "bg-amber-600"
+                }`}
+              >
+                {navigation.stage}
+              </span>
+            </div>
+          </div>
+          {/* Progress bar track */}
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5, 6].map((step) => {
+              const current = parseInt(navigation.stage_progress?.split("/")[0] || "1");
+              return (
+                <div
+                  key={step}
+                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                    step <= current ? "bg-green-500" : "bg-slate-700"
+                  }`}
+                />
+              );
+            })}
+          </div>
         </div>
 
         {/* Tactic Header */}
-        <div className="mt-8">
+        <div className="mt-4">
           <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-400">
             {navigation.tactic}
           </p>
         </div>
 
         {/* SAY THIS — Giant Teleprompter */}
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-center text-4xl font-bold leading-snug text-green-300">
+        <div className="flex flex-1 items-center justify-center px-4">
+          <p className="text-center text-3xl font-bold leading-relaxed text-green-300">
             {navigation.say_this}
           </p>
         </div>
+
+        {/* Next Milestone — bottom */}
+        {navigation.next_milestone && (
+          <div className="mt-auto pt-4 border-t border-slate-800">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Next Goal</p>
+            <p className="text-sm text-slate-400">{navigation.next_milestone}</p>
+          </div>
+        )}
       </div>
     </div>
   );
