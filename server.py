@@ -10,14 +10,24 @@ from dotenv import load_dotenv
 import websockets as ws_client
 import hmac
 
-# Load environment variables
+# Load environment variables (no-op on Render/production where env vars are injected)
 load_dotenv(dotenv_path=".env.local", override=True)
 
 app = FastAPI()
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Validate required env vars on startup
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 COPILOT_API_KEY = os.getenv("COPILOT_API_KEY", "")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY is not set")
+if not DEEPGRAM_API_KEY:
+    raise RuntimeError("DEEPGRAM_API_KEY is not set")
+if not COPILOT_API_KEY:
+    raise RuntimeError("COPILOT_API_KEY is not set")
+
+client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # ---------------------------------------------------------
 # LOAD KNOWLEDGE BASE FROM FILES
