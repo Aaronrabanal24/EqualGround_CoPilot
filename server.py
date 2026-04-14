@@ -261,14 +261,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
         print(f"[{current_stage}] Prospect: {user_text}")
 
-        # Echo transcript back to UI
-        await websocket.send_json({
-            "type": "transcript",
-            "speaker": "Prospect",
-            "text": user_text,
-        })
-
-        # Log prospect's speech
+        # Log prospect's speech (transcript already echoed by smart buffer)
         call_history.append({"role": "user", "content": user_text})
 
         # Build stage-aware prompt + smart context window
@@ -409,25 +402,57 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
         transcript_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
-        # --- Background task: read transcripts from Deepgram ---
+        # --- Background task: read transcripts from Deepgram with smart buffering ---
         async def listen_to_deepgram():
+            transcript_buffer = ""
             try:
                 async for msg in dg_ws:
                     data = json.loads(msg)
-                    # Only process final (non-interim) speech results
-                    if data.get("type") == "Results" and data.get("is_final"):
-                        transcript = (
-                            data.get("channel", {})
-                            .get("alternatives", [{}])[0]
-                            .get("transcript", "")
-                        )
-                        if transcript.strip():
-                            await transcript_queue.put(transcript)
+                    if data.get("type") != "Results":
+                        continue
+
+                    channel = data.get("channel", {})
+                    alternatives = channel.get("alternatives", [{}])
+                    transcript = alternatives[0].get("transcript", "")
+                    is_final = data.get("is_final", False)
+                    speech_final = data.get("speech_final", False)
+
+                    # 1. Accumulate confirmed words into the buffer
+                    if is_final and transcript:
+                        transcript_buffer += transcript + " "
+
+                        # Send confirmed text to frontend for live display
+                        if websocket.client_state == WebSocketState.CONNECTED:
+                            await websocket.send_json({
+                                "type": "transcript",
+                                "speaker": "Prospect",
+                                "text": transcript,
+                            })
+
+                    # 2. "Speech Final" = user finished their thought → fire OpenAI
+                    if speech_final and transcript_buffer.strip():
+                        complete_thought = transcript_buffer.strip()
+                        print(f"  UTTERANCE COMPLETE: {complete_thought}")
+                        await transcript_queue.put(complete_thought)
+                        transcript_buffer = ""
+
+                    # 3. Interim results → send to frontend for live-typing effect
+                    elif not is_final and transcript:
+                        live_text = transcript_buffer + transcript
+                        if websocket.client_state == WebSocketState.CONNECTED:
+                            await websocket.send_json({
+                                "type": "interim_update",
+                                "text": live_text,
+                            })
+
             except ws_client.exceptions.ConnectionClosed:
                 print("Deepgram connection closed")
             except Exception as e:
                 print(f"Deepgram listener error: {e}")
             finally:
+                # Flush any remaining buffered text
+                if transcript_buffer.strip():
+                    await transcript_queue.put(transcript_buffer.strip())
                 await transcript_queue.put(None)
 
         dg_listener_task = asyncio.create_task(listen_to_deepgram())

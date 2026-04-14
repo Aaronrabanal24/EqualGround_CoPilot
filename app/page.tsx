@@ -35,6 +35,10 @@ type IncomingMessage =
   | {
       type: "summary";
       text: string;
+    }
+  | {
+      type: "interim_update";
+      text: string;
     };
 
 const STAGE_LABELS = ["Gatekeeper", "Intro", "Credibility", "Discovery", "Pitch", "CTA"];
@@ -71,6 +75,7 @@ export default function Home() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [prevSayThis, setPrevSayThis] = useState("");
   const [sayThisKey, setSayThisKey] = useState(0);
+  const [interimText, setInterimText] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -112,6 +117,7 @@ export default function Home() {
       const data = JSON.parse(event.data) as IncomingMessage;
       if (data.type === "transcript") {
         setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
+        setInterimText("");
       } else if (data.type === "navigation") {
         setNavigation({
           stage: data.stage,
@@ -121,6 +127,8 @@ export default function Home() {
           next_milestone: data.next_milestone ?? "",
           stage_progress: data.stage_progress ?? "",
         });
+      } else if (data.type === "interim_update") {
+        setInterimText(data.text);
       } else if (data.type === "summary") {
         setSummary(data.text);
         setIsGeneratingSummary(false);
@@ -324,6 +332,15 @@ export default function Home() {
                 </div>
               </div>
             ))
+          )}
+          {interimText && (
+            <div className="flex gap-3 items-start opacity-50">
+              <span className="text-[10px] text-gray-600 font-mono pt-1 shrink-0 w-16 tabular-nums">{getTimestamp()}</span>
+              <div className="min-w-0">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400/60">Prospect</span>
+                <p className="text-sm leading-relaxed text-gray-500 mt-0.5 italic">{interimText}</p>
+              </div>
+            </div>
           )}
           <div ref={transcriptEndRef} />
         </div>
