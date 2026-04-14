@@ -218,10 +218,20 @@ RULES:
 # ---------------------------------------------------------
 def build_context_window(call_history: list) -> list:
     """Keep first 3 messages (intro context) + last 15 messages (recent context).
-    This prevents losing who the DM is, their name, and role."""
+    This prevents losing who the DM is, their name, and role.
+    Maps assistant_voice (rep's spoken words) to assistant role for OpenAI."""
     if len(call_history) <= 18:
-        return list(call_history)
-    return call_history[:3] + call_history[-15:]
+        window = list(call_history)
+    else:
+        window = call_history[:3] + call_history[-15:]
+    # Map assistant_voice to assistant role for OpenAI compatibility
+    mapped = []
+    for entry in window:
+        if entry["role"] == "assistant_voice":
+            mapped.append({"role": "assistant", "content": f"[Rep said aloud]: {entry['content']}"})
+        else:
+            mapped.append(entry)
+    return mapped
 
 
 # ---------------------------------------------------------
@@ -269,6 +279,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     dg_ws = None
     transcript_task = None
     dg_listener_task = None
+    audio_mode = "mono"  # "mono" = mic-only, "stereo" = dual (mic+system)
     print("Client connected to WebSocket")
 
     # ------ helper: process a final transcript from Deepgram ------
@@ -344,8 +355,17 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             "6. **Recommended Next Steps**: Specific actions with timeline\n"
             "7. **Call Stage Reached**: Which stage did the call get to?"
         )
+        def _role_label(role: str) -> str:
+            if role == "user":
+                return "PROSPECT"
+            if role == "assistant_voice":
+                return "REP (spoken)"
+            if role == "assistant":
+                return "COPILOT"
+            return role.upper()
+
         transcript_text = "\n".join(
-            f"{entry['role']}: {entry['content']}" for entry in call_history
+            f"{_role_label(entry['role'])}: {entry['content']}" for entry in call_history
         )
         summary_messages = [
             {"role": "system", "content": summary_prompt},
@@ -368,6 +388,8 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         for entry in call_history:
             if entry["role"] == "user":
                 formatted_transcript += f"PROSPECT: {entry['content']}\n\n"
+            elif entry["role"] == "assistant_voice":
+                formatted_transcript += f"REP (spoken): {entry['content']}\n\n"
             elif entry["role"] == "assistant":
                 try:
                     ai_dict = json.loads(entry["content"])
@@ -396,68 +418,107 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         })
 
         # --- Connect to Deepgram's streaming WebSocket API ---
-        dg_params = urlencode({
+        # Deepgram params are configured based on audio_mode set by the client.
+        # Default is mono (mic-only). Stereo (multichannel) is used when the
+        # client sends system + mic audio as a 2-channel interleaved stream.
+        dg_base_params = {
             "model": "nova-2",
             "language": "en-US",
             "smart_format": "true",
             "encoding": "linear16",
             "sample_rate": "16000",
-            "channels": "1",
             "interim_results": "true",
             "utterance_end_ms": "1500",
             "vad_events": "true",
-        })
-        dg_url = f"wss://api.deepgram.com/v1/listen?{dg_params}"
-        dg_headers = {"Authorization": f"Token {DEEPGRAM_API_KEY}"}
+        }
 
-        print(f"Connecting to Deepgram...")
-        try:
-            dg_ws = await ws_client.connect(dg_url, additional_headers=dg_headers, proxy=None)
-        except ws_client.exceptions.InvalidStatus as e:
-            body = e.response.body.decode() if e.response.body else "no body"
-            print(f"Deepgram rejected: HTTP {e.response.status_code} - {body}")
-            raise
-        print("Deepgram live WebSocket connected")
+        async def _connect_deepgram():
+            nonlocal dg_ws
+            if audio_mode == "stereo":
+                dg_base_params["channels"] = "2"
+                dg_base_params["multichannel"] = "true"
+            else:
+                dg_base_params["channels"] = "1"
+
+            dg_params = urlencode(dg_base_params)
+            dg_url = f"wss://api.deepgram.com/v1/listen?{dg_params}"
+            dg_headers = {"Authorization": f"Token {DEEPGRAM_API_KEY}"}
+
+            print(f"Connecting to Deepgram (mode={audio_mode})...")
+            try:
+                dg_ws = await ws_client.connect(dg_url, additional_headers=dg_headers, proxy=None)
+            except ws_client.exceptions.InvalidStatus as e:
+                body = e.response.body.decode() if e.response.body else "no body"
+                print(f"Deepgram rejected: HTTP {e.response.status_code} - {body}")
+                raise
+            print(f"Deepgram live WebSocket connected (channels={'2' if audio_mode == 'stereo' else '1'})")
+
+        # Don't connect to Deepgram yet — wait for audio_mode message or first audio bytes
+        dg_connected = False
 
         transcript_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
         # --- Background task: read transcripts from Deepgram with smart buffering ---
         async def listen_to_deepgram():
-            transcript_buffer = ""
+            # In stereo mode, we maintain per-channel buffers.
+            # Channel 0 = mic (Rep), Channel 1 = system (Prospect).
+            # In mono mode, everything is channel 0 and labeled Prospect (legacy).
+            prospect_buffer = ""
+            rep_buffer = ""
             try:
                 async for msg in dg_ws:
                     data = json.loads(msg)
                     if data.get("type") != "Results":
                         continue
 
-                    channel = data.get("channel", {})
-                    alternatives = channel.get("alternatives", [{}])
+                    channel_obj = data.get("channel", {})
+                    alternatives = channel_obj.get("alternatives", [{}])
                     transcript = alternatives[0].get("transcript", "")
                     is_final = data.get("is_final", False)
                     speech_final = data.get("speech_final", False)
+                    channel_index = data.get("channel_index", [0, 1])
+                    ch = channel_index[0] if isinstance(channel_index, list) else 0
 
-                    # 1. Accumulate confirmed words into the buffer
+                    if audio_mode == "stereo":
+                        # Channel 0 = mic (Rep), Channel 1 = system (Prospect)
+                        is_prospect = (ch == 1)
+                        speaker = "Prospect" if is_prospect else "You"
+                    else:
+                        # Mono mode: everything treated as Prospect (legacy behavior)
+                        is_prospect = True
+                        speaker = "Prospect"
+
                     if is_final and transcript:
-                        transcript_buffer += transcript + " "
+                        if is_prospect:
+                            prospect_buffer += transcript + " "
+                        else:
+                            rep_buffer += transcript + " "
 
                         # Send confirmed text to frontend for live display
                         if websocket.client_state == WebSocketState.CONNECTED:
                             await websocket.send_json({
                                 "type": "transcript",
-                                "speaker": "Prospect",
+                                "speaker": speaker,
                                 "text": transcript,
                             })
 
-                    # 2. "Speech Final" = user finished their thought → fire OpenAI
-                    if speech_final and transcript_buffer.strip():
-                        complete_thought = transcript_buffer.strip()
-                        print(f"  UTTERANCE COMPLETE: {complete_thought}")
-                        await transcript_queue.put(complete_thought)
-                        transcript_buffer = ""
+                    # "Speech Final" = speaker finished their thought
+                    if speech_final:
+                        if is_prospect and prospect_buffer.strip():
+                            complete_thought = prospect_buffer.strip()
+                            print(f"  PROSPECT UTTERANCE: {complete_thought}")
+                            await transcript_queue.put(complete_thought)
+                            prospect_buffer = ""
+                        elif not is_prospect and rep_buffer.strip():
+                            # Log rep speech to history for context, but don't trigger coaching
+                            rep_text = rep_buffer.strip()
+                            print(f"  REP UTTERANCE: {rep_text}")
+                            call_history.append({"role": "assistant_voice", "content": rep_text})
+                            rep_buffer = ""
 
-                    # 3. Interim results → send to frontend for live-typing effect
-                    elif not is_final and transcript:
-                        live_text = transcript_buffer + transcript
+                    # Interim results → send to frontend for live-typing effect
+                    elif not is_final and transcript and is_prospect:
+                        live_text = prospect_buffer + transcript
                         if websocket.client_state == WebSocketState.CONNECTED:
                             await websocket.send_json({
                                 "type": "interim_update",
@@ -469,12 +530,10 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             except Exception as e:
                 print(f"Deepgram listener error: {e}")
             finally:
-                # Flush any remaining buffered text
-                if transcript_buffer.strip():
-                    await transcript_queue.put(transcript_buffer.strip())
+                # Flush any remaining buffered prospect text
+                if prospect_buffer.strip():
+                    await transcript_queue.put(prospect_buffer.strip())
                 await transcript_queue.put(None)
-
-        dg_listener_task = asyncio.create_task(listen_to_deepgram())
 
         # --- Background task: drain transcript queue -> OpenAI ---
         async def process_transcripts():
@@ -488,8 +547,6 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                 except Exception as e:
                     print(f"Error processing transcript: {e}")
 
-        transcript_task = asyncio.create_task(process_transcripts())
-
         # --- Main loop: receive frames from browser ---
         while True:
             message = await websocket.receive()
@@ -499,13 +556,23 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
             # Binary audio frames -> forward to Deepgram
             if "bytes" in message and message["bytes"]:
+                # Lazily connect to Deepgram on first audio frame
+                if not dg_connected:
+                    await _connect_deepgram()
+                    dg_connected = True
+                    dg_listener_task = asyncio.create_task(listen_to_deepgram())
+                    transcript_task = asyncio.create_task(process_transcripts())
                 await dg_ws.send(message["bytes"])
 
-            # Text JSON commands (end_call, etc.)
+            # Text JSON commands (audio_mode, end_call, etc.)
             elif "text" in message and message["text"]:
                 data = json.loads(message["text"])
 
-                if data.get("type") == "end_call":
+                if data.get("type") == "audio_mode":
+                    audio_mode = data.get("mode", "mono")
+                    print(f"Audio mode set to: {audio_mode}")
+
+                elif data.get("type") == "end_call":
                     await _generate_summary()
                     break
 

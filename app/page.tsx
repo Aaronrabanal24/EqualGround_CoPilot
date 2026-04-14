@@ -76,10 +76,12 @@ export default function Home() {
   const [prevSayThis, setPrevSayThis] = useState("");
   const [sayThisKey, setSayThisKey] = useState(0);
   const [interimText, setInterimText] = useState("");
+  const [audioMode, setAudioMode] = useState<"mic" | "system">("system");
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const systemStreamRef = useRef<MediaStream | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll transcript
@@ -153,6 +155,7 @@ export default function Home() {
       ws.close();
       mediaRecorderRef.current?.stop();
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      systemStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
@@ -161,87 +164,197 @@ export default function Home() {
       // Stop recording
       mediaRecorderRef.current?.stop();
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      systemStreamRef.current?.getTracks().forEach((t) => t.stop());
       mediaRecorderRef.current = null;
       mediaStreamRef.current = null;
+      systemStreamRef.current = null;
       setIsListening(false);
       return;
     }
 
     try {
-      // Capture mic audio — raw, no processing
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 16000,
-          channelCount: 1,
-        },
-      });
-      mediaStreamRef.current = stream;
+      if (audioMode === "system") {
+        // ── DUAL CAPTURE: system audio (prospect) + mic (rep) → stereo PCM ──
+        // 1. Capture system/tab audio (prospect's voice)
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: 1, height: 1, frameRate: 1 },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        } as DisplayMediaStreamOptions);
 
-      // We need to convert to 16-bit PCM (linear16) for Deepgram.
-      // Use AudioContext to resample + extract raw PCM, then send in 250ms chunks.
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      let audioBuffer: Int16Array[] = [];
-      let sampleCount = 0;
-      const samplesPerChunk = 16000 / 4; // 250ms at 16kHz = 4000 samples
-
-      processor.onaudioprocess = (e) => {
-        if (!mediaRecorderRef.current) return;
-        const float32 = e.inputBuffer.getChannelData(0);
-        // Convert float32 [-1,1] to int16
-        const int16 = new Int16Array(float32.length);
-        for (let i = 0; i < float32.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        // Verify we got an audio track
+        const systemAudioTracks = displayStream.getAudioTracks();
+        if (systemAudioTracks.length === 0) {
+          displayStream.getTracks().forEach((t) => t.stop());
+          alert("No audio track captured. Make sure to check 'Share tab audio' or 'Share system audio' in the dialog.");
+          return;
         }
-        audioBuffer.push(int16);
-        sampleCount += int16.length;
 
-        // Flush every ~250ms worth of samples
-        if (sampleCount >= samplesPerChunk) {
-          const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
-          const merged = new Int16Array(totalLen);
-          let offset = 0;
-          for (const chunk of audioBuffer) {
-            merged.set(chunk, offset);
-            offset += chunk.length;
+        // Discard the video track (required by Chrome but we don't need it)
+        displayStream.getVideoTracks().forEach((t) => t.stop());
+
+        // 2. Capture mic audio (rep's voice)
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 16000,
+            channelCount: 1,
+          },
+        });
+
+        mediaStreamRef.current = micStream;
+        systemStreamRef.current = new MediaStream(systemAudioTracks);
+
+        // 3. Merge into stereo: left=mic (rep), right=system (prospect)
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        const systemSource = audioContext.createMediaStreamSource(new MediaStream(systemAudioTracks));
+
+        const merger = audioContext.createChannelMerger(2);
+        micSource.connect(merger, 0, 0);     // mic → left channel (ch0)
+        systemSource.connect(merger, 0, 1);  // system → right channel (ch1)
+
+        // Use ScriptProcessor to extract stereo PCM
+        const processor = audioContext.createScriptProcessor(4096, 2, 2);
+        merger.connect(processor);
+        processor.connect(audioContext.destination);
+
+        let audioBuffer: Int16Array[] = [];
+        let sampleCount = 0;
+        const samplesPerChunk = 16000 / 4; // 250ms at 16kHz
+
+        processor.onaudioprocess = (e) => {
+          if (!mediaRecorderRef.current) return;
+          const left = e.inputBuffer.getChannelData(0);   // mic (rep)
+          const right = e.inputBuffer.getChannelData(1);   // system (prospect)
+
+          // Interleave into stereo int16: [L0, R0, L1, R1, ...]
+          const interleaved = new Int16Array(left.length * 2);
+          for (let i = 0; i < left.length; i++) {
+            const lSample = Math.max(-1, Math.min(1, left[i]));
+            const rSample = Math.max(-1, Math.min(1, right[i]));
+            interleaved[i * 2] = lSample < 0 ? lSample * 0x8000 : lSample * 0x7fff;
+            interleaved[i * 2 + 1] = rSample < 0 ? rSample * 0x8000 : rSample * 0x7fff;
           }
-          // Send raw PCM bytes to server
-          if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(merged.buffer);
+          audioBuffer.push(interleaved);
+          sampleCount += left.length;
+
+          if (sampleCount >= samplesPerChunk) {
+            const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
+            const merged = new Int16Array(totalLen);
+            let offset = 0;
+            for (const chunk of audioBuffer) {
+              merged.set(chunk, offset);
+              offset += chunk.length;
+            }
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(merged.buffer);
+            }
+            audioBuffer = [];
+            sampleCount = 0;
           }
-          audioBuffer = [];
-          sampleCount = 0;
+        };
+
+        // Notify backend this is multichannel audio
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "audio_mode", mode: "stereo" }));
         }
-      };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+        mediaRecorderRef.current = { stop: () => {
+          processor.disconnect();
+          merger.disconnect();
+          micSource.disconnect();
+          systemSource.disconnect();
+          audioContext.close();
+        }} as unknown as MediaRecorder;
 
-      // Use a sentinel object so we can check if recording is active
-      mediaRecorderRef.current = { stop: () => {
-        processor.disconnect();
-        source.disconnect();
-        audioContext.close();
-      }} as unknown as MediaRecorder;
+        setIsListening(true);
+      } else {
+        // ── MIC-ONLY MODE (testing/demo) ──
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            sampleRate: 16000,
+            channelCount: 1,
+          },
+        });
+        mediaStreamRef.current = stream;
 
-      setIsListening(true);
+        // Notify backend this is mono mic audio
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "audio_mode", mode: "mono" }));
+        }
+
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        let audioBuffer: Int16Array[] = [];
+        let sampleCount = 0;
+        const samplesPerChunk = 16000 / 4;
+
+        processor.onaudioprocess = (e) => {
+          if (!mediaRecorderRef.current) return;
+          const float32 = e.inputBuffer.getChannelData(0);
+          const int16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]));
+            int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+          }
+          audioBuffer.push(int16);
+          sampleCount += int16.length;
+
+          if (sampleCount >= samplesPerChunk) {
+            const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
+            const merged = new Int16Array(totalLen);
+            let offset = 0;
+            for (const chunk of audioBuffer) {
+              merged.set(chunk, offset);
+              offset += chunk.length;
+            }
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(merged.buffer);
+            }
+            audioBuffer = [];
+            sampleCount = 0;
+          }
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        mediaRecorderRef.current = { stop: () => {
+          processor.disconnect();
+          source.disconnect();
+          audioContext.close();
+        }} as unknown as MediaRecorder;
+
+        setIsListening(true);
+      }
     } catch (err) {
       console.error("Could not start audio capture:", err);
-      alert("Microphone access denied or unavailable.");
+      if (audioMode === "system") {
+        alert("Screen sharing was cancelled or denied. Make sure to select a tab and check 'Share audio'.");
+      } else {
+        alert("Microphone access denied or unavailable.");
+      }
     }
-  }, [isListening]);
+  }, [isListening, audioMode]);
 
   const endCall = useCallback(() => {
     mediaRecorderRef.current?.stop();
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    systemStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaRecorderRef.current = null;
     mediaStreamRef.current = null;
+    systemStreamRef.current = null;
     setIsListening(false);
     setIsGeneratingSummary(true);
     wsRef.current?.send(JSON.stringify({ type: "end_call" }));
@@ -349,6 +462,37 @@ export default function Home() {
 
         {/* Controls Bar */}
         <div className="px-6 py-4 border-t border-gray-800/60 bg-gray-950">
+          {/* Audio Source Selector */}
+          {!isListening && (
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Audio Source</span>
+              <div className="flex rounded-lg border border-gray-700 overflow-hidden">
+                <button
+                  onClick={() => setAudioMode("system")}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    audioMode === "system"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-750"
+                  }`}
+                >
+                  Call Audio
+                </button>
+                <button
+                  onClick={() => setAudioMode("mic")}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    audioMode === "mic"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-750"
+                  }`}
+                >
+                  Mic Only
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-600">
+                {audioMode === "system" ? "Captures prospect from your call app" : "For testing — mic labels as Prospect"}
+              </span>
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={toggleMicrophone}
