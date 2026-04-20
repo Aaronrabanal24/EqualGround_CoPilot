@@ -70,7 +70,7 @@
         "prospect mentions their current approach or tool",
         "prospect asks how to fix it"
       ],
-      "instructions": "Reference the accessibility scan you ran on their homepage. Mention it came back non-compliant under Title II. Be matter-of-fact, not alarming. This builds authority — you did homework before calling. Transition to discovery by asking how they are currently handling remediation.",
+      "instructions": "Reference the accessibility scan you ran on their homepage AND the recent DOJ deadline extension. The DOJ just extended the deadline to April 2027, which means most prospects will feel relieved — your job is to reframe: the extension was granted because compliance is harder than expected, not because it went away. The substantive requirements are unchanged and private right of action still exists. Be matter-of-fact, not alarming. This builds authority — you know the details of the IFR and they probably don't.",
       "few_shot": [
         {
           "prospect": "OK, what did you find?",
@@ -83,6 +83,10 @@
         {
           "prospect": "Yeah we know about that. We've been working on it.",
           "say_this": "Good. So what's your approach been so far? Are you handling it in-house or using a tool?"
+        },
+        {
+          "prospect": "I heard they pushed the deadline back though.",
+          "say_this": "They did — to April 2027. The reason they extended it is actually because the DOJ said the work turned out to be harder than expected. The requirements are identical, and individuals can still sue. If anything, it tells us the compliance gap is real."
         }
       ]
     },
