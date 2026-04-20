@@ -46,6 +46,7 @@ type IncomingMessage =
     };
 
 type GuideTab = "stages" | "objections" | "competitors" | "personas";
+type GuideView = "flow" | "search";
 
 type KBStage = {
   id: string;
@@ -53,7 +54,7 @@ type KBStage = {
   name: string;
   goal: string;
   instructions: string;
-  few_shot?: Array<{ say_this?: string }>;
+  few_shot?: Array<{ prospect?: string; say_this?: string }>;
 };
 
 type KBObjection = {
@@ -85,13 +86,6 @@ type KBPayload = {
 
 const STAGE_LABELS = ["Gatekeeper", "Intro", "Credibility", "Discovery", "Pitch", "CTA"];
 const STAGE_IDS = ["GATEKEEPER", "INTRO", "CREDIBILITY", "DISCOVERY", "PITCH", "CTA"];
-
-const GUIDE_TABS: Array<{ key: GuideTab; label: string }> = [
-  { key: "stages", label: "📋 Stages" },
-  { key: "objections", label: "🛡 Objections" },
-  { key: "competitors", label: "⚔️ Competitors" },
-  { key: "personas", label: "👤 Personas" },
-];
 
 const GUIDE_OBJECTION_GROUPS = [
   {
@@ -181,7 +175,10 @@ export default function Home() {
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("default");
   const [appMode, setAppMode] = useState<"live" | "guide">("live");
-  const [guideTab, setGuideTab] = useState<GuideTab>("stages");
+  const [guideView, setGuideView] = useState<GuideView>("flow");
+  const [guideActiveStageIndex, setGuideActiveStageIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedTalkingPoints, setExpandedTalkingPoints] = useState<Set<number>>(new Set());
   const [guideNavigation, setGuideNavigation] = useState<Navigation | null>(null);
   const [kb, setKb] = useState<Record<string, unknown> | null>(null);
   const [selectedGuideItem, setSelectedGuideItem] = useState<{ tab: GuideTab; key: string } | null>(null);
@@ -219,125 +216,6 @@ export default function Home() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcripts]);
-
-  useEffect(() => {
-    if (appMode === "guide" && !kb) {
-      fetch("/api/kb")
-        .then((r) => r.json())
-        .then(setKb)
-        .catch(() => {
-          setGuideNavigation({
-            ...DEFAULT_NAVIGATION,
-            stage: "GUIDE",
-            prospect_signal: "Knowledge base could not be loaded.",
-            insight: "Please try refreshing the page.",
-            talking_points: [],
-          });
-        });
-    }
-  }, [appMode, kb]);
-
-  useEffect(() => {
-    if (appMode !== "live") {
-      wsRef.current?.close();
-      wsRef.current = null;
-      setConnected(false);
-      return;
-    }
-
-    let cancelled = false;
-    let ws: WebSocket | null = null;
-
-    async function connect() {
-      // Fetch a short-lived, single-use session token from the Next.js API route
-      let sessionToken: string;
-      try {
-        const res = await fetch("/api/session", { method: "POST" });
-        if (!res.ok) throw new Error(`Session request failed: ${res.status}`);
-        const data = await res.json();
-        sessionToken = data.session_token;
-      } catch {
-        if (!cancelled) {
-          setTranscripts((prev) => [
-            ...prev,
-            { speaker: "System", text: "Failed to obtain session token. Check server configuration.", timestamp: getTimestamp() },
-          ]);
-        }
-        return;
-      }
-
-      if (cancelled) return;
-
-      let wsUrl: string;
-      if (process.env.NEXT_PUBLIC_WS_URL) {
-        wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
-      } else if (window.location.hostname.includes("app.github.dev")) {
-        const host = window.location.hostname.replace(/-\d+\./, "-8000.");
-        wsUrl = `wss://${host}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
-      } else {
-        wsUrl = `ws://127.0.0.1:8000/ws/ui?token=${encodeURIComponent(sessionToken)}`;
-      }
-
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnected(true);
-        setTranscripts([{ speaker: "System", text: "Connected. Ready when you are.", timestamp: getTimestamp() }]);
-      };
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data) as IncomingMessage;
-        if (data.type === "transcript") {
-          setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
-          setInterimText("");
-        } else if (data.type === "navigation") {
-          setNavigation({
-            stage: data.stage,
-            tactic: data.tactic,
-            prospect_signal: data.prospect_signal ?? "",
-            insight: data.insight ?? "",
-            talking_points: data.talking_points ?? [],
-            objection_label: data.objection_label ?? null,
-            next_milestone: data.next_milestone ?? "",
-            stage_progress: data.stage_progress ?? "",
-          });
-        } else if (data.type === "interim_update") {
-          setInterimText(data.text);
-        } else if (data.type === "summary") {
-          setSummary(data.text);
-          setIsGeneratingSummary(false);
-        }
-      };
-
-      ws.onerror = () => {
-        setConnected(false);
-        setTranscripts((prev) => [
-          ...prev,
-          { speaker: "System", text: "Connection error. Check that the backend is running on port 8000.", timestamp: getTimestamp() },
-        ]);
-      };
-
-      ws.onclose = (event) => {
-        setConnected(false);
-        // 4001 = expired or invalid session token — retry once with a fresh token
-        if (event.code === 4001 && !cancelled) {
-          console.warn("Session token rejected (4001). Retrying with a fresh token...");
-          connect();
-        }
-      };
-    }
-
-    connect();
-
-    return () => {
-      cancelled = true;
-      ws?.close();
-      mediaRecorderRef.current?.stop();
-      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-      systemStreamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, [appMode]);
 
   const toggleMicrophone = useCallback(async () => {
     if (isListening) {
@@ -497,9 +375,12 @@ export default function Home() {
     wsRef.current?.send(JSON.stringify({ type: "end_call" }));
   }, []);
 
-  const mapToStageNavigation = (stage: KBStage) => {
+  const mapToStageNavigation = useCallback((stage: KBStage) => {
     const order = stage.order || 1;
+    const activeIndex = STAGE_IDS.indexOf(stage.id);
+    setGuideActiveStageIndex(activeIndex >= 0 ? activeIndex : Math.max(0, order - 1));
     setSelectedGuideItem({ tab: "stages", key: stage.id });
+    setExpandedTalkingPoints(new Set());
     setGuideNavigation({
       stage: stage.id,
       tactic: "STAGE GUIDE",
@@ -510,12 +391,13 @@ export default function Home() {
       next_milestone: stage.goal,
       stage_progress: `${order}/6`,
     });
-  };
+  }, []);
 
   const mapToObjectionNavigation = (key: string, displayName: string) => {
     const objection = objections[key];
     if (!objection) return;
     setSelectedGuideItem({ tab: "objections", key });
+    setExpandedTalkingPoints(new Set());
     setGuideNavigation({
       stage: "OBJECTION",
       tactic: objection.tactic,
@@ -532,6 +414,7 @@ export default function Home() {
     const competitor = competitors[key];
     if (!competitor) return;
     setSelectedGuideItem({ tab: "competitors", key });
+    setExpandedTalkingPoints(new Set());
     setGuideNavigation({
       stage: "COMPETITOR",
       tactic: "BATTLECARD",
@@ -548,6 +431,7 @@ export default function Home() {
     const persona = personas[key];
     if (!persona) return;
     setSelectedGuideItem({ tab: "personas", key });
+    setExpandedTalkingPoints(new Set());
     setGuideNavigation({
       stage: "PERSONA",
       tactic: "PERSONA GUIDE",
@@ -559,6 +443,129 @@ export default function Home() {
       stage_progress: "",
     });
   };
+
+  useEffect(() => {
+    if (appMode === "guide" && !kb) {
+      fetch("/api/kb")
+        .then((r) => r.json())
+        .then((data) => {
+          setKb(data);
+          const firstStage = data?.call_stages?.stages?.[0];
+          if (firstStage) mapToStageNavigation(firstStage);
+        })
+        .catch(() => {
+          setGuideNavigation({
+            ...DEFAULT_NAVIGATION,
+            stage: "GUIDE",
+            prospect_signal: "Knowledge base could not be loaded.",
+            insight: "Please try refreshing the page.",
+            talking_points: [],
+          });
+        });
+    }
+  }, [appMode, kb, mapToStageNavigation]);
+
+  useEffect(() => {
+    if (appMode !== "live") {
+      wsRef.current?.close();
+      wsRef.current = null;
+      setConnected(false);
+      return;
+    }
+
+    let cancelled = false;
+    let ws: WebSocket | null = null;
+
+    async function connect() {
+      // Fetch a short-lived, single-use session token from the Next.js API route
+      let sessionToken: string;
+      try {
+        const res = await fetch("/api/session", { method: "POST" });
+        if (!res.ok) throw new Error(`Session request failed: ${res.status}`);
+        const data = await res.json();
+        sessionToken = data.session_token;
+      } catch {
+        if (!cancelled) {
+          setTranscripts((prev) => [
+            ...prev,
+            { speaker: "System", text: "Failed to obtain session token. Check server configuration.", timestamp: getTimestamp() },
+          ]);
+        }
+        return;
+      }
+
+      if (cancelled) return;
+
+      let wsUrl: string;
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      } else if (window.location.hostname.includes("app.github.dev")) {
+        const host = window.location.hostname.replace(/-\d+\./, "-8000.");
+        wsUrl = `wss://${host}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      } else {
+        wsUrl = `ws://127.0.0.1:8000/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      }
+
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setConnected(true);
+        setTranscripts([{ speaker: "System", text: "Connected. Ready when you are.", timestamp: getTimestamp() }]);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data) as IncomingMessage;
+        if (data.type === "transcript") {
+          setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
+          setInterimText("");
+        } else if (data.type === "navigation") {
+          setNavigation({
+            stage: data.stage,
+            tactic: data.tactic,
+            prospect_signal: data.prospect_signal ?? "",
+            insight: data.insight ?? "",
+            talking_points: data.talking_points ?? [],
+            objection_label: data.objection_label ?? null,
+            next_milestone: data.next_milestone ?? "",
+            stage_progress: data.stage_progress ?? "",
+          });
+        } else if (data.type === "interim_update") {
+          setInterimText(data.text);
+        } else if (data.type === "summary") {
+          setSummary(data.text);
+          setIsGeneratingSummary(false);
+        }
+      };
+
+      ws.onerror = () => {
+        setConnected(false);
+        setTranscripts((prev) => [
+          ...prev,
+          { speaker: "System", text: "Connection error. Check that the backend is running on port 8000.", timestamp: getTimestamp() },
+        ]);
+      };
+
+      ws.onclose = (event) => {
+        setConnected(false);
+        // 4001 = expired or invalid session token — retry once with a fresh token
+        if (event.code === 4001 && !cancelled) {
+          console.warn("Session token rejected (4001). Retrying with a fresh token...");
+          connect();
+        }
+      };
+    }
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      ws?.close();
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      systemStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [appMode]);
 
   const activeNavigation = appMode === "guide" ? guideNavigation : navigation;
   const rawStageNum = Number.parseInt(activeNavigation?.stage_progress?.split("/")[0] ?? "1", 10);
@@ -787,92 +794,264 @@ export default function Home() {
                   <span className="text-sm text-gray-500">No recording needed — click any card for instant coaching</span>
                 </div>
 
-                <div className="px-6 pt-3 border-b border-gray-800/60">
-                  <div className="flex gap-5">
-                    {GUIDE_TABS.map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setGuideTab(tab.key)}
-                        className={`border-b-2 pb-2 text-sm font-medium transition-colors ${
-                          guideTab === tab.key
-                            ? "border-blue-500 text-blue-400"
-                            : "border-transparent text-gray-500 hover:text-gray-300"
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
+                <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-800/60">
+                  <button
+                    onClick={() => setGuideView("flow")}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                      guideView === "flow"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    ▶ Follow the Call
+                  </button>
+                  <button
+                    onClick={() => setGuideView("search")}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                      guideView === "search"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    ⚡ Quick Find
+                  </button>
+                </div>
+
+                {guideView === "flow" ? (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
+                    {stages.map((stage, i) => {
+                      const isSelectedStage = selectedGuideItem?.tab === "stages" && selectedGuideItem.key === stage.id;
+                      const isActive = guideActiveStageIndex === i || isSelectedStage;
+                      if (!isActive) {
+                        return (
+                          <button
+                            key={stage.id}
+                            onClick={() => {
+                              setGuideActiveStageIndex(i);
+                              mapToStageNavigation(stage);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors"
+                          >
+                            <div className="h-2 w-2 rounded-full bg-gray-700 shrink-0" />
+                            <span className="text-sm text-gray-500">{i + 1} · {STAGE_LABELS[i] ?? stage.name}</span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div key={stage.id} className="border-l-2 border-blue-500 bg-blue-600/8 mx-2 rounded-r-lg mb-1">
+                          <div className="flex items-center gap-3 px-4 py-3">
+                            <div className="h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.6)] shrink-0" />
+                            <span className="text-sm font-semibold text-white">{i + 1} · {STAGE_LABELS[i] ?? stage.name}</span>
+                          </div>
+
+                          {stage.few_shot?.[0]?.say_this && (
+                            <div className="px-4 pb-3">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Open with</p>
+                              <p className="text-sm text-white leading-relaxed bg-gray-800/60 rounded-lg px-3 py-2">
+                                &quot;{stage.few_shot[0].say_this}&quot;
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="px-4 pb-4">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">If they say →</p>
+                            <div className="flex flex-wrap gap-2">
+                              {(stage.few_shot ?? []).slice(1).map((shot, si) => (
+                                <button
+                                  key={si}
+                                  onClick={() => {
+                                    setSelectedGuideItem({ tab: "stages", key: stage.id });
+                                    setExpandedTalkingPoints(new Set());
+                                    setGuideNavigation({
+                                      stage: stage.id,
+                                      tactic: "STAGE GUIDE",
+                                      prospect_signal: shot.prospect ?? "",
+                                      insight: "",
+                                      talking_points: shot.say_this ? [shot.say_this] : [],
+                                      objection_label: null,
+                                      next_milestone: stage.goal,
+                                      stage_progress: `${i + 1}/6`,
+                                    });
+                                  }}
+                                  className="text-xs px-3 py-1.5 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors text-left"
+                                >
+                                  {(shot.prospect ?? "").length > 40
+                                    ? `${(shot.prospect ?? "").slice(0, 40)}...`
+                                    : (shot.prospect ?? "")}
+                                </button>
+                              ))}
+
+                              {i === 0 && (
+                                <button
+                                  onClick={() => mapToObjectionNavigation("no_budget", "No Budget")}
+                                  className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                                >
+                                  No Budget
+                                </button>
+                              )}
+                              {i === 2 && (
+                                <button
+                                  onClick={() => mapToObjectionNavigation("deadline_extended", "Deadline Extended")}
+                                  className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                                >
+                                  Deadline Extended
+                                </button>
+                              )}
+                              {i === 3 && (
+                                <>
+                                  <button onClick={() => mapToCompetitorNavigation("overlay", "AudioEye / Overlays")} className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors">AudioEye</button>
+                                  <button onClick={() => mapToCompetitorNavigation("civicplus_granicus", "CivicPlus / Granicus")} className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors">CivicPlus</button>
+                                  <button onClick={() => mapToCompetitorNavigation("equidox", "Equidox")} className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors">Equidox</button>
+                                  <button onClick={() => mapToObjectionNavigation("no_budget", "No Budget")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">No Budget</button>
+                                  <button onClick={() => mapToObjectionNavigation("cant_modify_cms", "Can't Modify CMS")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Can&apos;t Modify CMS</button>
+                                </>
+                              )}
+                              {i === 4 && (
+                                <>
+                                  <button onClick={() => mapToObjectionNavigation("too_complex", "Too Complex")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Too Complex</button>
+                                  <button onClick={() => mapToObjectionNavigation("bulk_remediation", "Bulk Remediation")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Bulk Remediation</button>
+                                </>
+                              )}
+                              {i === 5 && (
+                                <>
+                                  <button onClick={() => mapToObjectionNavigation("not_my_decision", "Not My Decision")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Not My Decision</button>
+                                  <button onClick={() => mapToObjectionNavigation("too_busy", "Too Busy")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Too Busy</button>
+                                  <button onClick={() => mapToObjectionNavigation("send_email", "Send Email")} className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors">Send Email</button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {i < 5 && (
+                            <div className="px-4 pb-4">
+                              <button
+                                onClick={() => {
+                                  const nextIndex = i + 1;
+                                  setGuideActiveStageIndex(nextIndex);
+                                  const nextStage = stages[nextIndex];
+                                  if (nextStage) mapToStageNavigation(nextStage);
+                                }}
+                                className="w-full rounded-lg border border-gray-700 bg-gray-800/60 py-2 text-xs font-semibold text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+                              >
+                                → Next: {STAGE_LABELS[i + 1]}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
-                  {guideTab === "stages" && stages.map((stage) => {
-                    const displayOrder = stage.order >= 1 && stage.order <= STAGE_LABELS.length ? stage.order : 1;
-                    return (
-                      <button
-                        key={stage.id}
-                        onClick={() => mapToStageNavigation(stage)}
-                        className={`w-full px-4 py-3 text-left text-sm transition-colors ${
-                          selectedGuideItem?.tab === "stages" && selectedGuideItem.key === stage.id
-                            ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
-                            : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                        }`}
-                      >
-                        {displayOrder} · {STAGE_LABELS[displayOrder - 1] ?? stage.name}
-                      </button>
-                    );
-                  })}
-
-                  {guideTab === "objections" && GUIDE_OBJECTION_GROUPS.map((group) => (
-                    <div key={group.label}>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-4 pt-4 pb-1">{group.label}</p>
-                      {group.items.map((item) => (
-                        <button
-                          key={item.key}
-                          onClick={() => mapToObjectionNavigation(item.key, item.name)}
-                          className={`w-full px-4 py-3 text-left text-sm transition-colors ${
-                            selectedGuideItem?.tab === "objections" && selectedGuideItem.key === item.key
-                              ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
-                              : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                          } disabled:opacity-40`}
-                          disabled={!objections[item.key]}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
+                ) : (
+                  <div className="flex flex-col flex-1 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-800/60">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="budget, audioeye, civic, complex..."
+                          autoFocus
+                          className="w-full rounded-lg border border-gray-700 bg-gray-800 pl-8 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+                        />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  ))}
 
-                  {guideTab === "competitors" && GUIDE_COMPETITORS.map((item) => (
-                    <button
-                      key={item.key}
-                      onClick={() => mapToCompetitorNavigation(item.key, item.name)}
-                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
-                        selectedGuideItem?.tab === "competitors" && selectedGuideItem.key === item.key
-                          ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
-                          : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                      } disabled:opacity-40`}
-                      disabled={!competitors[item.key]}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
+                      {searchQuery.trim() === "" ? (
+                        <div className="px-4 py-3 space-y-4">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-2">COMPETITORS</p>
+                            {GUIDE_COMPETITORS.map((item) => (
+                              <button key={item.key} onClick={() => mapToCompetitorNavigation(item.key, item.name)} disabled={!competitors[item.key]}
+                                className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                <span>{item.name}</span>
+                                <span className="text-[10px] text-red-400/60 uppercase font-bold">Competitor</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-2">OBJECTIONS</p>
+                            {GUIDE_OBJECTION_GROUPS.flatMap((g) => g.items).map((item) => (
+                              <button key={item.key} onClick={() => mapToObjectionNavigation(item.key, item.name)} disabled={!objections[item.key]}
+                                className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                <span>{item.name}</span>
+                                <span className="text-[10px] text-amber-400/60 uppercase font-bold">Objection</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-2">PERSONAS</p>
+                            {GUIDE_PERSONAS.map((item) => (
+                              <button key={item.key} onClick={() => mapToPersonaNavigation(item.key, item.name)} disabled={!personas[item.key]}
+                                className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                <span>{item.name}</span>
+                                <span className="text-[10px] text-blue-400/60 uppercase font-bold">Persona</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        (() => {
+                          const q = searchQuery.toLowerCase();
+                          const competitorResults = GUIDE_COMPETITORS.filter((item) =>
+                            item.name.toLowerCase().includes(q) || item.key.toLowerCase().includes(q)
+                          );
+                          const objectionResults = GUIDE_OBJECTION_GROUPS.flatMap((g) => g.items).filter((item) =>
+                            item.name.toLowerCase().includes(q) || item.key.toLowerCase().includes(q)
+                          );
+                          const personaResults = GUIDE_PERSONAS.filter((item) =>
+                            item.name.toLowerCase().includes(q) || item.key.toLowerCase().includes(q)
+                          );
+                          const total = competitorResults.length + objectionResults.length + personaResults.length;
 
-                  {guideTab === "personas" && GUIDE_PERSONAS.map((item) => (
-                    <button
-                      key={item.key}
-                      onClick={() => mapToPersonaNavigation(item.key, item.name)}
-                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
-                        selectedGuideItem?.tab === "personas" && selectedGuideItem.key === item.key
-                          ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
-                          : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                      } disabled:opacity-40`}
-                      disabled={!personas[item.key]}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
+                          if (total === 0) {
+                            return (
+                              <div className="flex items-center justify-center h-32">
+                                <p className="text-sm text-gray-600 italic">No results for &quot;{searchQuery}&quot;</p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="px-4 py-2 space-y-1">
+                              {competitorResults.map((item) => (
+                                <button key={item.key} onClick={() => { mapToCompetitorNavigation(item.key, item.name); setSearchQuery(""); }} disabled={!competitors[item.key]}
+                                  className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                  <span>{item.name}</span>
+                                  <span className="text-[10px] text-red-400/60 uppercase font-bold">Competitor</span>
+                                </button>
+                              ))}
+                              {objectionResults.map((item) => (
+                                <button key={item.key} onClick={() => { mapToObjectionNavigation(item.key, item.name); setSearchQuery(""); }} disabled={!objections[item.key]}
+                                  className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                  <span>{item.name}</span>
+                                  <span className="text-[10px] text-amber-400/60 uppercase font-bold">Objection</span>
+                                </button>
+                              ))}
+                              {personaResults.map((item) => (
+                                <button key={item.key} onClick={() => { mapToPersonaNavigation(item.key, item.name); setSearchQuery(""); }} disabled={!personas[item.key]}
+                                  className="w-full px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white rounded-lg transition-colors disabled:opacity-40 flex items-center justify-between">
+                                  <span>{item.name}</span>
+                                  <span className="text-[10px] text-blue-400/60 uppercase font-bold">Persona</span>
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -973,14 +1152,39 @@ export default function Home() {
 
                   {activeNavigation && activeNavigation.talking_points.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">🗣 Say This</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">Say This</p>
                       <ul className="space-y-2">
-                        {activeNavigation.talking_points.map((point, i) => (
-                          <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
-                            <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
-                            <span className="text-base font-medium leading-relaxed text-white">{point}</span>
-                          </li>
-                        ))}
+                        {activeNavigation.talking_points.map((point, i) => {
+                          const firstSentenceEnd = point.search(/[.!?](\s|$)/);
+                          const firstSentence = firstSentenceEnd > 0 ? point.slice(0, firstSentenceEnd + 1) : point;
+                          const hasMore = firstSentence.length < point.length;
+                          const isExpanded = expandedTalkingPoints.has(i);
+
+                          return (
+                            <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
+                              <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
+                              <div className="min-w-0">
+                                <span className="text-base font-medium leading-relaxed text-white">
+                                  {isExpanded ? point : firstSentence}
+                                </span>
+                                {hasMore && (
+                                  <button
+                                    onClick={() => {
+                                      setExpandedTalkingPoints((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(i)) next.delete(i); else next.add(i);
+                                        return next;
+                                      });
+                                    }}
+                                    className="ml-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                  >
+                                    {isExpanded ? "less" : "+ more"}
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
