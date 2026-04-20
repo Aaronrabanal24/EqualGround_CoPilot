@@ -10,11 +10,10 @@ export async function GET() {
     try {
       const filePath = path.join(process.cwd(), "knowledge", `${f}.json`);
       kb[f] = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         {
           error: `Failed to load knowledge file: ${f}.json`,
-          details: error instanceof Error ? error.message : "Unknown error",
         },
         { status: 500 },
       );
