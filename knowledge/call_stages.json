@@ -17,7 +17,7 @@
       "few_shot": [
         {
           "prospect": "Thank you for calling, how can I help you?",
-          "say_this": "Hi, I ran a scan of your homepage using our accessibility platform and it came back at 29% compliance under Title II AA guidelines — I was hoping to speak with someone who oversees that. How are you guys approaching that?"
+          "say_this": "Hi, I ran a scan of your homepage using our accessibility platform and it came back as non-compliant under the new Title II guidelines — I was hoping to speak with someone who oversees that. How are you guys approaching that?"
         },
         {
           "prospect": "What company are you with?",
@@ -57,7 +57,7 @@
         },
         {
           "prospect": "This is Mike, what can I do for you?",
-          "say_this": "Hey Mike, I was the one who ran the scan on your homepage — it came back at 29% under Title II AA. Wanted to see how you guys are approaching that."
+          "say_this": "Hey Mike, I was the one who ran the scan on your homepage — it came back as non-compliant under the new Title II guidelines. Wanted to see how you guys are approaching that."
         },
         {
           "prospect": "Yeah I handle most of the web stuff. What's up?",
@@ -90,7 +90,7 @@
         },
         {
           "prospect": "OK, what did you find?",
-          "say_this": "Your homepage came back at 29% compliance under Title II AA — that is a significant gap from the 100% required. Given the deadline just moved to April 2027, wanted to understand how you are currently approaching it."
+          "say_this": "Your homepage came back as non-compliant under the new Title II guidelines — there is a significant gap from the 100% required. Given the deadline just moved to April 2027, wanted to understand how you are currently approaching it."
         },
         {
           "prospect": "Non-compliant? What do you mean?",
