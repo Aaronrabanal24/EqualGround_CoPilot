@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import asyncio
 import secrets
@@ -32,6 +33,30 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # Session tokens: token -> expiry (single-use, short-lived)
 SESSION_TOKENS: dict[str, datetime] = {}
+
+
+def extract_json_from_response(text: str) -> dict:
+    """Try multiple strategies to parse JSON from LLM output."""
+    # Strategy 1: Direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Extract first JSON object from mixed text
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 3: Return a safe fallback structure
+    return {
+        "error": "parse_failed",
+        "raw": text[:500],
+    }
+
 
 # ---------------------------------------------------------
 # LOAD KNOWLEDGE BASE FROM FILES
@@ -334,20 +359,28 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         context = build_context_window(call_history)
         messages = [{"role": "system", "content": system_prompt}] + context
 
-        # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) ---
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            response_format={"type": "json_object"},
-        )
+        # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) with retry ---
+        guidance = None
+        for attempt in range(3):
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                response_format={"type": "json_object"},
+            )
 
-        ai_response_text = response.choices[0].message.content
+            ai_response_text = response.choices[0].message.content
+            result = extract_json_from_response(ai_response_text)
+            if result.get("error") != "parse_failed":
+                guidance = result
+                break
+            print(f"  [retry {attempt+1}/3] AI parse failed. Snippet: {result['raw'][:100]}")
+
+        if guidance is None:
+            print(f"  [SKIP] All retries exhausted for: {user_text[:80]}")
+            return
 
         # Log AI advice to history
         call_history.append({"role": "assistant", "content": ai_response_text})
-
-        # Parse JSON response
-        guidance = json.loads(ai_response_text)
         if "objection_label" not in guidance:
             guidance["objection_label"] = None
 
