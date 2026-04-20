@@ -104,63 +104,94 @@ export default function Home() {
   }, [navigation.prospect_signal, prevSayThis]);
 
   useEffect(() => {
-    let wsUrl: string;
-    const token = process.env.NEXT_PUBLIC_COPILOT_API_KEY || "";
+    let cancelled = false;
+    let ws: WebSocket | null = null;
 
-    if (process.env.NEXT_PUBLIC_WS_URL) {
-      wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/ws/ui?token=${encodeURIComponent(token)}`;
-    } else if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
-      const host = window.location.hostname.replace(/-\d+\./, "-8000.");
-      wsUrl = `wss://${host}/ws/ui?token=${encodeURIComponent(token)}`;
-    } else {
-      wsUrl = `ws://127.0.0.1:8000/ws/ui?token=${encodeURIComponent(token)}`;
-    }
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      setTranscripts([{ speaker: "System", text: "Connected. Ready when you are.", timestamp: getTimestamp() }]);
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data) as IncomingMessage;
-      if (data.type === "transcript") {
-        setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
-        setInterimText("");
-      } else if (data.type === "navigation") {
-        setNavigation({
-          stage: data.stage,
-          tactic: data.tactic,
-          prospect_signal: data.prospect_signal ?? "",
-          insight: data.insight ?? "",
-          talking_points: data.talking_points ?? [],
-          objection_label: data.objection_label ?? null,
-          next_milestone: data.next_milestone ?? "",
-          stage_progress: data.stage_progress ?? "",
-        });
-      } else if (data.type === "interim_update") {
-        setInterimText(data.text);
-      } else if (data.type === "summary") {
-        setSummary(data.text);
-        setIsGeneratingSummary(false);
+    async function connect() {
+      // Fetch a short-lived, single-use session token from the Next.js API route
+      let sessionToken: string;
+      try {
+        const res = await fetch("/api/session", { method: "POST" });
+        if (!res.ok) throw new Error(`Session request failed: ${res.status}`);
+        const data = await res.json();
+        sessionToken = data.session_token;
+      } catch {
+        if (!cancelled) {
+          setTranscripts((prev) => [
+            ...prev,
+            { speaker: "System", text: "Failed to obtain session token. Check server configuration.", timestamp: getTimestamp() },
+          ]);
+        }
+        return;
       }
-    };
 
-    ws.onerror = () => {
-      setConnected(false);
-      setTranscripts((prev) => [
-        ...prev,
-        { speaker: "System", text: "Connection error. Check that the backend is running on port 8000.", timestamp: getTimestamp() },
-      ]);
-    };
+      if (cancelled) return;
 
-    ws.onclose = () => {
-      setConnected(false);
-    };
+      let wsUrl: string;
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      } else if (window.location.hostname.includes("app.github.dev")) {
+        const host = window.location.hostname.replace(/-\d+\./, "-8000.");
+        wsUrl = `wss://${host}/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      } else {
+        wsUrl = `ws://127.0.0.1:8000/ws/ui?token=${encodeURIComponent(sessionToken)}`;
+      }
+
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setConnected(true);
+        setTranscripts([{ speaker: "System", text: "Connected. Ready when you are.", timestamp: getTimestamp() }]);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data) as IncomingMessage;
+        if (data.type === "transcript") {
+          setTranscripts((prev) => [...prev, { speaker: data.speaker, text: data.text, timestamp: getTimestamp() }]);
+          setInterimText("");
+        } else if (data.type === "navigation") {
+          setNavigation({
+            stage: data.stage,
+            tactic: data.tactic,
+            prospect_signal: data.prospect_signal ?? "",
+            insight: data.insight ?? "",
+            talking_points: data.talking_points ?? [],
+            objection_label: data.objection_label ?? null,
+            next_milestone: data.next_milestone ?? "",
+            stage_progress: data.stage_progress ?? "",
+          });
+        } else if (data.type === "interim_update") {
+          setInterimText(data.text);
+        } else if (data.type === "summary") {
+          setSummary(data.text);
+          setIsGeneratingSummary(false);
+        }
+      };
+
+      ws.onerror = () => {
+        setConnected(false);
+        setTranscripts((prev) => [
+          ...prev,
+          { speaker: "System", text: "Connection error. Check that the backend is running on port 8000.", timestamp: getTimestamp() },
+        ]);
+      };
+
+      ws.onclose = (event) => {
+        setConnected(false);
+        // 4001 = expired or invalid session token — retry once with a fresh token
+        if (event.code === 4001 && !cancelled) {
+          console.warn("Session token rejected (4001). Retrying with a fresh token...");
+          connect();
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      ws.close();
+      cancelled = true;
+      ws?.close();
       mediaRecorderRef.current?.stop();
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
       systemStreamRef.current?.getTracks().forEach((t) => t.stop());

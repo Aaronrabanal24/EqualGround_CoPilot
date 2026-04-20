@@ -1,14 +1,15 @@
 import os
 import json
 import asyncio
+import secrets
 from pathlib import Path
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, HTTPException, status
 from starlette.websockets import WebSocketState
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import websockets as ws_client
-import hmac
 
 # Load environment variables (no-op on Render/production where env vars are injected)
 load_dotenv(dotenv_path=".env.local", override=True)
@@ -28,6 +29,9 @@ if not COPILOT_API_KEY:
     raise RuntimeError("COPILOT_API_KEY is not set")
 
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+# Session tokens: token -> expiry (single-use, short-lived)
+SESSION_TOKENS: dict[str, datetime] = {}
 
 # ---------------------------------------------------------
 # LOAD KNOWLEDGE BASE FROM FILES
@@ -271,16 +275,38 @@ async def root():
 
 
 # ---------------------------------------------------------
+# SESSION TOKEN EXCHANGE
+# ---------------------------------------------------------
+@app.post("/auth/session")
+async def create_session(request: Request):
+    api_key = request.headers.get("X-API-Key")
+    if not COPILOT_API_KEY or api_key != COPILOT_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Purge expired tokens to prevent unbounded growth
+    now = datetime.utcnow()
+    expired = [t for t, exp in SESSION_TOKENS.items() if now > exp]
+    for t in expired:
+        del SESSION_TOKENS[t]
+
+    token = secrets.token_urlsafe(32)
+    SESSION_TOKENS[token] = now + timedelta(minutes=5)
+    return {"session_token": token}
+
+
+# ---------------------------------------------------------
 # WEBSOCKET REAL-TIME ENGINE (DEEPGRAM BINARY AUDIO)
 # ---------------------------------------------------------
 @app.websocket("/ws/ui")
 async def websocket_ui_endpoint(websocket: WebSocket):
-    # --- API Key Handshake ---
+    # --- Session Token Validation (BEFORE accept) ---
     token = websocket.query_params.get("token", "")
-    if not COPILOT_API_KEY or not hmac.compare_digest(token, COPILOT_API_KEY):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        print("Rejected WebSocket: invalid or missing API key")
+    expiry = SESSION_TOKENS.get(token)
+    if not expiry or datetime.utcnow() > expiry:
+        await websocket.close(code=4001)
+        print("Rejected WebSocket: invalid or expired session token")
         return
+    del SESSION_TOKENS[token]  # single-use
 
     await websocket.accept()
     call_history: list[dict] = []
