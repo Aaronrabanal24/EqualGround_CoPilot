@@ -1,12 +1,13 @@
 import os
 import re
 import json
+import logging
 import asyncio
 import secrets
 from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from starlette.websockets import WebSocketState
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -14,6 +15,31 @@ import websockets as ws_client
 
 # Load environment variables (no-op on Render/production where env vars are injected)
 load_dotenv(dotenv_path=".env.local", override=True)
+
+# Structured logging
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("equalground")
+
+# --------------- log helpers ---------------
+_PII_PATTERN = re.compile(
+    r'\b[\w.-]+@[\w.-]+\.\w+\b'           # email
+    r'|\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b' # US phone
+    r'|\b\d{3}-\d{2}-\d{4}\b',            # SSN
+)
+
+def redact_pii(text: str) -> str:
+    """Replace emails, phone numbers, and SSNs with [REDACTED]."""
+    return _PII_PATTERN.sub("[REDACTED]", text)
+
+def sanitize_for_log(text: str, max_len: int = 80) -> str:
+    """Truncate and redact PII for safe logging."""
+    clean = redact_pii(text)
+    if len(clean) > max_len:
+        return clean[:max_len] + "…"
+    return clean
 
 app = FastAPI()
 
@@ -81,9 +107,12 @@ STAGE_ORDER  = [s["id"] for s in KB_STAGES["stages"]]
 # KEYWORD DETECTION HELPERS
 # ---------------------------------------------------------
 def _text_matches(text: str, phrases: list[str]) -> bool:
-    """Check if any trigger phrase appears in the text (case-insensitive)."""
+    """Check if any trigger phrase appears as a whole word in the text (case-insensitive)."""
     lower = text.lower()
-    return any(p.lower() in lower for p in phrases)
+    return any(
+        re.search(r'\b' + re.escape(p.lower()) + r'\b', lower)
+        for p in phrases
+    )
 
 
 def detect_competitor(text: str) -> dict | None:
@@ -332,7 +361,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     expiry = SESSION_TOKENS.get(token)
     if not expiry or datetime.utcnow() > expiry:
         await websocket.close(code=4001)
-        print("Rejected WebSocket: invalid or expired session token")
+        logger.warning("Rejected WebSocket: invalid or expired session token")
         return
     del SESSION_TOKENS[token]  # single-use
 
@@ -343,7 +372,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
     transcript_task = None
     dg_listener_task = None
     audio_mode = "mono"  # "mono" = mic-only, "stereo" = dual (mic+system)
-    print("Client connected to WebSocket")
+    logger.info("Client connected to WebSocket")
 
     # ------ helper: process a final transcript from Deepgram ------
     async def _handle_transcript(user_text: str):
@@ -352,7 +381,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         if not user_text.strip():
             return
 
-        print(f"[{current_stage}] Prospect: {user_text}")
+        logger.debug("[%s] Prospect: %s", current_stage, sanitize_for_log(user_text))
 
         # Log prospect's speech (transcript already echoed by smart buffer)
         call_history.append({"role": "user", "content": user_text})
@@ -383,10 +412,10 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             if result.get("error") != "parse_failed":
                 guidance = result
                 break
-            print(f"  [retry {attempt+1}/3] AI parse failed. Snippet: {result['raw'][:100]}")
+            logger.warning("  [retry %d/3] AI parse failed. Snippet: %s", attempt + 1, result['raw'][:100])
 
         if guidance is None:
-            print(f"  [SKIP] All retries exhausted for: {user_text[:80]}")
+            logger.error("  [SKIP] All retries exhausted for: %s", sanitize_for_log(user_text))
             return
 
         # Log AI advice to history
@@ -406,7 +435,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         if "next_milestone" not in guidance:
             guidance["next_milestone"] = STAGES_BY_ID[current_stage]["goal"]
 
-        print(f"  -> [{guidance['tactic']}] {guidance.get('prospect_signal', '')}")
+        logger.info("  -> [%s] %s", guidance['tactic'], guidance.get('prospect_signal', ''))
 
         # Push to UI
         await websocket.send_json({
@@ -423,7 +452,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
     # ------ helper: generate post-call summary ------
     async def _generate_summary():
-        print("Generating post-call summary using gpt-4o...")
+        logger.info("Generating post-call summary using gpt-4o...")
 
         summary_prompt = (
             "Based on this call history, generate a CRM-ready summary with these sections:\n"
@@ -528,14 +557,14 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             dg_url = f"wss://api.deepgram.com/v1/listen?{dg_params}"
             dg_headers = {"Authorization": f"Token {DEEPGRAM_API_KEY}"}
 
-            print(f"Connecting to Deepgram (mode={audio_mode})...")
+            logger.info("Connecting to Deepgram (mode=%s)...", audio_mode)
             try:
                 dg_ws = await ws_client.connect(dg_url, additional_headers=dg_headers, proxy=None)
             except ws_client.exceptions.InvalidStatus as e:
                 body = e.response.body.decode() if e.response.body else "no body"
-                print(f"Deepgram rejected: HTTP {e.response.status_code} - {body}")
+                logger.error("Deepgram rejected: HTTP %s - %s", e.response.status_code, body)
                 raise
-            print(f"Deepgram live WebSocket connected (channels={'2' if audio_mode == 'stereo' else '1'})")
+            logger.info("Deepgram live WebSocket connected (channels=%s)", '2' if audio_mode == 'stereo' else '1')
 
         # Don't connect to Deepgram yet — wait for audio_mode message or first audio bytes
         dg_connected = False
@@ -590,13 +619,13 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     if speech_final:
                         if is_prospect and prospect_buffer.strip():
                             complete_thought = prospect_buffer.strip()
-                            print(f"  PROSPECT UTTERANCE: {complete_thought}")
+                            logger.debug("  PROSPECT UTTERANCE: %s", sanitize_for_log(complete_thought))
                             await transcript_queue.put(complete_thought)
                             prospect_buffer = ""
                         elif not is_prospect and rep_buffer.strip():
                             # Log rep speech to history for context, but don't trigger coaching
                             rep_text = rep_buffer.strip()
-                            print(f"  REP UTTERANCE: {rep_text}")
+                            logger.debug("  REP UTTERANCE: %s", sanitize_for_log(rep_text))
                             call_history.append({"role": "assistant_voice", "content": rep_text})
                             rep_buffer = ""
 
@@ -610,9 +639,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                             })
 
             except ws_client.exceptions.ConnectionClosed:
-                print("Deepgram connection closed")
+                logger.info("Deepgram connection closed")
             except Exception as e:
-                print(f"Deepgram listener error: {e}")
+                logger.error("Deepgram listener error: %s", e)
             finally:
                 # Flush any remaining buffered prospect text
                 if prospect_buffer.strip():
@@ -629,7 +658,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     if websocket.client_state == WebSocketState.CONNECTED:
                         await _handle_transcript(text)
                 except Exception as e:
-                    print(f"Error processing transcript: {e}")
+                    logger.error("Error processing transcript: %s", e)
 
         # --- Main loop: receive frames from browser ---
         while True:
@@ -654,7 +683,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
 
                 if data.get("type") == "audio_mode":
                     audio_mode = data.get("mode", "mono")
-                    print(f"Audio mode set to: {audio_mode}")
+                    logger.info("Audio mode set to: %s", audio_mode)
 
                 elif data.get("type") == "set_stage":
                     requested = data.get("stage", "")
@@ -662,7 +691,7 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                         current_stage = requested
                         stage_idx = STAGE_ORDER.index(current_stage) + 1
                         stage_info = STAGES_BY_ID[current_stage]
-                        print(f"User manually set stage to: {current_stage}")
+                        logger.info("User manually set stage to: %s", current_stage)
                         await websocket.send_json({
                             "type": "navigation",
                             "stage": current_stage,
@@ -680,9 +709,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     break
 
     except WebSocketDisconnect:
-        print("Client disconnected from WebSocket")
+        logger.info("Client disconnected from WebSocket")
     except Exception as e:
-        print(f"Error in WebSocket: {e}")
+        logger.error("Error in WebSocket: %s", e)
     finally:
         # Clean up Deepgram connection and background tasks
         if dg_ws:
@@ -695,4 +724,4 @@ async def websocket_ui_endpoint(websocket: WebSocket):
             transcript_task.cancel()
         if dg_listener_task:
             dg_listener_task.cancel()
-        print("WebSocket session ended")
+        logger.info("WebSocket session ended")
