@@ -52,12 +52,12 @@
       "instructions": "Confirm you are talking to the right person. Reference that you were directed to them. Be conversational and brief. If they confirm, immediately transition to credibility.",
       "few_shot": [
         {
-          "prospect": "This is Mike, what can I do for you?",
-          "say_this": "Hey Mike. I was directed to you as the best person to talk to about the county's website accessibility. Is that something you handle?"
+          "prospect": "This is [Name], what can I do for you?",
+          "say_this": "Hey [Name]. I was directed to you as the best person to talk to about the county's website accessibility. Is that something you handle?"
         },
         {
-          "prospect": "This is Mike, what can I do for you?",
-          "say_this": "Hey Mike, I was the one who ran the scan on your homepage — it came back as non-compliant under the new Title II guidelines. Wanted to see how you guys are approaching that."
+          "prospect": "This is [Name], what can I do for you?",
+          "say_this": "Hey [Name], I was the one who ran the scan on your homepage — it came back as non-compliant under the new Title II guidelines. Wanted to see how you guys are approaching that."
         },
         {
           "prospect": "Yeah I handle most of the web stuff. What's up?",
