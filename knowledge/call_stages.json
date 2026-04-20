@@ -13,27 +13,23 @@
         "prospect introduces themselves as the right contact",
         "prospect asks what this is about after being transferred"
       ],
-      "instructions": "Lead with the specific scan score — always reference the actual AA percentage from the pre-call scan. This is your reason for calling and your credibility hook in one line. If asked what company you are with, say YuJa and immediately pivot back to the compliance question. Do NOT pitch EqualGround by name yet. Do NOT mention features. Your only goal is the transfer to the right person.",
+      "instructions": "Your only goal is to get transferred to the person who handles website accessibility. Keep it short, friendly, and neutral like a peer. Do not share scan details, compliance language, or company/pitch details at this stage. If they are unsure, help them identify the right role (webmaster, IT director, or whoever handles the website).",
       "few_shot": [
         {
           "prospect": "Thank you for calling, how can I help you?",
-          "say_this": "Hi, I ran a scan of your homepage using our accessibility platform and it came back as non-compliant under the new Title II guidelines — I was hoping to speak with someone who oversees that. How are you guys approaching that?"
+          "say_this": "Hi, I'm hoping you can help me out — I'm looking to speak with whoever oversees the county's website accessibility."
         },
         {
-          "prospect": "What company are you with?",
-          "say_this": "YuJa — I just wanted to learn more about how you guys are approaching the compliance side."
+          "prospect": "I'm not sure who that would be.",
+          "say_this": "It'd probably be someone like a webmaster, IT director, whoever handles the website."
         },
         {
           "prospect": "What is this regarding?",
-          "say_this": "I ran a scan of your website and it flagged some Title II compliance issues — wanted to connect with whoever handles that."
+          "say_this": "I ran a scan on your site and wanted to share what I found with whoever handles that."
         },
         {
-          "prospect": "That would be our IT director. Let me transfer you.",
-          "say_this": "That would be great, thank you."
-        },
-        {
-          "prospect": "We already handle that.",
-          "say_this": "Good to hear. Who on your team would be the right person to connect with about it? I just wanted to share what the scan found."
+          "prospect": "I handle that.",
+          "say_this": "Perfect — is website accessibility something you handle?"
         }
       ]
     },
