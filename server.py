@@ -111,15 +111,11 @@ def detect_persona(text: str) -> dict | None:
 
 
 # ---------------------------------------------------------
-# DYNAMIC PROMPT BUILDER
+# CACHED PROMPT SECTIONS (built once at startup for OpenAI prompt caching)
 # ---------------------------------------------------------
-def build_system_prompt(stage_id: str, recent_text: str, call_history: list) -> str:
-    """Compose a focused system prompt based on current call stage and context."""
-
-    stage = STAGES_BY_ID.get(stage_id, STAGES_BY_ID["GATEKEEPER"])
+def _build_static_prefix() -> str:
+    """Core identity + tone guardrails — identical across all calls."""
     product = KB_PRODUCT
-
-    # --- CORE IDENTITY (always included, ~200 tokens) ---
     core = f"""You are a real-time Sales Intelligence Advisor for a YuJa EqualGround Account Executive.
 You analyze the prospect's live speech and surface context, insights, and talking-point ideas so the rep can steer the conversation.
 
@@ -138,80 +134,6 @@ KEY DIFFERENTIATORS:
 
 TITLE II DEADLINE: {product['title_ii_compliance']['deadline_large']} for entities over 50k population. {product['title_ii_compliance']['deadline_small']} for smaller entities. Non-compliance means DOJ lawsuits, investigations, and loss of federal funding."""
 
-    # --- CURRENT STAGE INSTRUCTIONS (always included) ---
-    stage_section = f"""
-===== CURRENT CALL STAGE: {stage['name']} ({stage['order']}/6) =====
-GOAL: {stage['goal']}
-INSTRUCTIONS: {stage['instructions']}
-
-EXAMPLE — what good advice looks like at this stage:"""
-    for ex in stage["few_shot"]:
-        stage_section += f"""
-  Prospect says: "{ex['prospect']}"
-  -> prospect_signal: What they just revealed or implied
-  -> talking_points: 2-3 short ideas the rep could use"""
-
-    # --- STAGE TRANSITION RULES ---
-    next_stage_name = STAGES_BY_ID[stage["transition_to"]]["name"] if stage["transition_to"] else "N/A (final stage)"
-    stage_section += f"""
-
-STAGE TRANSITION: Move to '{next_stage_name}' when ANY of these happen:"""
-    for trigger in stage.get("transition_triggers", []):
-        stage_section += f"\n  - {trigger}"
-    stage_section += f"""
-If you detect a transition, set 'stage' to '{stage.get('transition_to', stage_id)}' in your response. Otherwise keep 'stage' as '{stage_id}'."""
-
-    # --- CONTEXTUAL MODULES (loaded on demand) ---
-    context_modules = ""
-
-    # Competitor battlecard — only if competitor mentioned
-    competitor = detect_competitor(recent_text)
-    if competitor:
-        context_modules += f"""
-
-===== COMPETITOR DETECTED =====
-THEIR FLAW: {competitor['their_flaw']}
-OUR PIVOT: {competitor['our_pivot']}
-EXAMPLE RESPONSES:"""
-        for resp in competitor["example_responses"][:2]:
-            context_modules += f'\n  - "{resp}"'
-
-    # Objection playbook — only if objection detected
-    objection = detect_objection(recent_text)
-    if objection:
-        context_modules += f"""
-
-===== OBJECTION DETECTED =====
-TACTIC: {objection['tactic']}
-CONTEXT: {objection.get('context', '')}
-INSTRUCTIONS: {objection['instructions']}
-EXAMPLE RESPONSES (use these as inspiration for talking points):"""
-        for resp in objection["example_responses"][:3]:
-            context_modules += f'\n  - "{resp}"'
-
-    # Persona info — only if persona detected
-    persona = detect_persona(recent_text)
-    if persona:
-        context_modules += f"""
-
-===== BUYER PERSONA DETECTED =====
-THEME: {persona['theme']}
-PIVOT TO: {persona['pivot_to']}
-DISCOVERY QUESTIONS TO ASK:"""
-        for q in persona["discovery_questions"][:2]:
-            context_modules += f'\n  - "{q}"'
-
-    # --- PRICING (only in PITCH or CTA stages) ---
-    pricing_section = ""
-    if stage_id in ("PITCH", "CTA"):
-        pricing_section = f"""
-
-===== PRICING (if asked) =====
-{product['pricing']['talk_track']}
-If pushed: {product['pricing']['if_pushed']}
-Anchor: {product['pricing']['anchor']}"""
-
-    # --- TONE GUARDRAILS (always included) ---
     tone = """
 
 ===== ADVISOR GUARDRAILS (CRITICAL) =====
@@ -222,10 +144,49 @@ Anchor: {product['pricing']['anchor']}"""
 5. Talking points should be IDEAS, not scripts. Short phrases the rep can naturally work into conversation.
 6. Match urgency to the moment. If the prospect is about to leave, say so. If they're opening up, note the opportunity."""
 
-    # --- OUTPUT FORMAT (always included) ---
-    stage_idx = STAGE_ORDER.index(stage_id) + 1 if stage_id in STAGE_ORDER else 1
-    next_milestone = stage["goal"]
-    output_rules = f"""
+    return core + tone
+
+
+def _build_stage_sections() -> dict[str, str]:
+    """Pre-build the stage-specific prompt section for each stage."""
+    sections = {}
+    for stage_id in STAGE_ORDER:
+        stage = STAGES_BY_ID[stage_id]
+        stage_idx = STAGE_ORDER.index(stage_id) + 1
+
+        stage_section = f"""
+
+===== CURRENT CALL STAGE: {stage['name']} ({stage['order']}/6) =====
+GOAL: {stage['goal']}
+INSTRUCTIONS: {stage['instructions']}
+
+EXAMPLE — what good advice looks like at this stage:"""
+        for ex in stage["few_shot"]:
+            stage_section += f"""
+  Prospect says: "{ex['prospect']}"
+  -> prospect_signal: What they just revealed or implied
+  -> talking_points: 2-3 short ideas the rep could use"""
+
+        next_stage_name = STAGES_BY_ID[stage["transition_to"]]["name"] if stage["transition_to"] else "N/A (final stage)"
+        stage_section += f"""
+
+STAGE TRANSITION: Move to '{next_stage_name}' when ANY of these happen:"""
+        for trigger in stage.get("transition_triggers", []):
+            stage_section += f"\n  - {trigger}"
+        stage_section += f"""
+If you detect a transition, set 'stage' to '{stage.get('transition_to', stage_id)}' in your response. Otherwise keep 'stage' as '{stage_id}'."""
+
+        pricing_section = ""
+        if stage_id in ("PITCH", "CTA"):
+            product = KB_PRODUCT
+            pricing_section = f"""
+
+===== PRICING (if asked) =====
+{product['pricing']['talk_track']}
+If pushed: {product['pricing']['if_pushed']}
+Anchor: {product['pricing']['anchor']}"""
+
+        output_rules = f"""
 
 ===== OUTPUT FORMAT =====
 Respond ONLY with this JSON — nothing else:
@@ -248,7 +209,49 @@ RULES:
 - Update 'stage' ONLY when a transition trigger is met. Do not skip stages.
 - 'next_milestone' should tell the rep what to aim for next."""
 
-    return core + stage_section + context_modules + pricing_section + tone + output_rules
+        sections[stage_id] = stage_section + pricing_section + output_rules
+
+    return sections
+
+
+# Build cached prompt parts at module load
+STATIC_SYSTEM_PREFIX: str = _build_static_prefix()
+STAGE_PROMPT_SECTIONS: dict[str, str] = _build_stage_sections()
+
+
+def build_dynamic_context(recent_text: str) -> str:
+    """Build per-utterance dynamic context (competitor/objection/persona detection)."""
+    context_modules = ""
+
+    competitor = detect_competitor(recent_text)
+    if competitor:
+        context_modules += f"""\n===== COMPETITOR DETECTED =====
+THEIR FLAW: {competitor['their_flaw']}
+OUR PIVOT: {competitor['our_pivot']}
+EXAMPLE RESPONSES:"""
+        for resp in competitor["example_responses"][:2]:
+            context_modules += f'\n  - "{resp}"'
+
+    objection = detect_objection(recent_text)
+    if objection:
+        context_modules += f"""\n===== OBJECTION DETECTED =====
+TACTIC: {objection['tactic']}
+CONTEXT: {objection.get('context', '')}
+INSTRUCTIONS: {objection['instructions']}
+EXAMPLE RESPONSES (use these as inspiration for talking points):"""
+        for resp in objection["example_responses"][:3]:
+            context_modules += f'\n  - "{resp}"'
+
+    persona = detect_persona(recent_text)
+    if persona:
+        context_modules += f"""\n===== BUYER PERSONA DETECTED =====
+THEME: {persona['theme']}
+PIVOT TO: {persona['pivot_to']}
+DISCOVERY QUESTIONS TO ASK:"""
+        for q in persona["discovery_questions"][:2]:
+            context_modules += f'\n  - "{q}"'
+
+    return context_modules
 
 
 # ---------------------------------------------------------
@@ -355,9 +358,16 @@ async def websocket_ui_endpoint(websocket: WebSocket):
         call_history.append({"role": "user", "content": user_text})
 
         # Build stage-aware prompt + smart context window
-        system_prompt = build_system_prompt(current_stage, user_text, call_history)
+        # System message = static prefix + stage section (stable within same stage → OpenAI caches)
+        system_prompt = STATIC_SYSTEM_PREFIX + STAGE_PROMPT_SECTIONS[current_stage]
         context = build_context_window(call_history)
-        messages = [{"role": "system", "content": system_prompt}] + context
+
+        # Dynamic context (competitor/objection/persona) as separate user message
+        dynamic_ctx = build_dynamic_context(user_text)
+        messages = [{"role": "system", "content": system_prompt}]
+        if dynamic_ctx:
+            messages.append({"role": "user", "content": f"[LIVE CONTEXT]{dynamic_ctx}"})
+        messages.extend(context)
 
         # --- DUAL MODEL: LIVE REFLEX PHASE (GPT-4o-mini) with retry ---
         guidance = None
