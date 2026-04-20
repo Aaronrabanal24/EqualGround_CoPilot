@@ -19,8 +19,8 @@
       "our_pivot": "Great for hosting. Most folks actually use EqualGround alongside them — CivicPlus handles the site, EqualGround handles the heavy lifting on PDF remediation and deep compliance.",
       "example_responses": [
         "CivicPlus is solid for the site itself. Most of our customers actually use us alongside them — CivicPlus handles the hosting and EqualGround handles the PDF remediation and deep scan. Are they covering the document side for you?",
-        "Yeah Granicus does a great job on the web side. The gap we usually see is with the thousands of historical PDFs that need to be tagged and remediated. Is that something they're handling for you?",
-        "Good. So the way most counties set it up is CivicPlus runs the site and EqualGround sits behind it scanning and fixing the underlying accessibility issues. Especially the document backlog.",
+        "Yeah Granicus does a great job on the web side. The gap we usually see is with all the old meeting minutes, agendas, and public notices that have been sitting there for years — are they handling that side for you?",
+        "Good. So the way most counties set it up is CivicPlus runs the site and EqualGround sits behind it scanning and fixing the underlying accessibility issues — especially all the old documents that nobody has gotten to yet.",
         "Does CivicPlus cover your documents too — PDFs, agendas, public notices? That is usually the gap. They handle the site but the document remediation piece is completely separate."
       ]
     },
@@ -60,12 +60,12 @@
     "manual_inhouse": {
       "names": ["manual", "in-house", "staff"],
       "trigger_phrases": ["doing it ourselves", "our team handles", "manually", "in-house", "our developer", "our web person", "we fix them ourselves"],
-      "their_flaw": "Manual remediation does not scale. A single web person cannot keep up with thousands of pages and PDFs that are constantly being added and updated. It's a bottomless pit of work.",
-      "our_pivot": "Manual works for a handful of pages. The challenge is when you have thousands of documents and the compliance clock is ticking. EqualGround automates the heavy lifting so your team can focus on the work that actually needs a human.",
+      "their_flaw": "Manual remediation does not scale. One person trying to fix things one by one while new content is being added every week — they'll never catch up. And old documents that have been sitting there for years don't get touched at all because there's no time.",
+      "our_pivot": "Manual works when it's a handful of pages. It doesn't work when you have years of old documents and a site that keeps growing. EqualGround automates the heavy lifting — Autopilot handles what it can, Structural Remediation Max handles the complex stuff — so your team isn't doing it one by one.",
       "example_responses": [
-        "How many pages and documents are we talking about? And is it one person or a team handling it?",
-        "Yeah that's what we hear a lot. One person trying to keep up with thousands of pages and new content being added every week. How are they prioritizing what to fix first?",
-        "Makes sense. So EqualGround basically automates the part that's eating up their time — the scanning, tagging, and fixing. That way your team can focus on the stuff that actually needs a human touch."
+        "How long has that been going on? And is it one person handling all of it or do you have a team?",
+        "Yeah that's what we hear a lot. Someone trying to keep up while new content keeps coming in — and there's usually a pile of old documents in the background that nobody has had time to get to. Is that the situation?",
+        "Makes sense. So EqualGround basically takes that off their plate — Autopilot handles the straightforward fixes automatically, Structural Remediation Max handles the complex ones. Your team is reviewing, not doing it one by one."
       ]
     }
   }

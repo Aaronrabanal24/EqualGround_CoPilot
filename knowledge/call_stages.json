@@ -119,15 +119,19 @@
         "prospect mentions budget or timeline",
         "prospect has answered 2-3 discovery questions"
       ],
-      "instructions": "Ask open-ended questions. Listen for pain: manual work, tool fatigue, lack of PDF remediation, audit pressure, fear of lawsuits. Use PEEL THE ONION — acknowledge their answer, then go deeper. Keep them talking. When you hear a gap (especially around PDFs or automation), that is your pivot to the pitch. Lead with document questions — PDF remediation is almost always the primary concern for government entities. Ask about split-vendor setups (separate doc tool + web scanner) as this is the most common pattern. Ask about board or commissioners meeting timelines to uncover real deadlines.",
+      "instructions": "Most people you call are doing nothing formal yet, or one person is chipping away at it by hand. Start there — ask 'how are you guys currently approaching it?' and mean it. If they say they're doing it themselves, that's your opening — find out how much there is and how long it's been going on. If they mention a tool, go deeper on what it actually covers. Almost everyone has old PDFs — meeting minutes, agendas, public notices — that nobody has touched yet. That's usually the real conversation. Ask about board or commissioners meeting timelines to find the actual deadline.",
       "few_shot": [
+        {
+          "prospect": "We've mostly been doing it manually. It's been a lot.",
+          "say_this": "Yeah I hear that a lot. How long has that been going on — and is it mainly the website or are you dealing with a ton of old PDFs too?"
+        },
+        {
+          "prospect": "Honestly we haven't really started yet.",
+          "say_this": "That's more common than you'd think. Is it more that it hasn't been a priority, or just nobody knows where to start?"
+        },
         {
           "prospect": "We've been using Siteimprove.",
           "say_this": "Got it. And has Siteimprove been handling the PDF side of things too, or just the web pages?"
-        },
-        {
-          "prospect": "We've mostly been doing it manually. It's been a lot.",
-          "say_this": "Yeah I hear that a lot. How many pages and documents are we talking about roughly?"
         },
         {
           "prospect": "I'm not sure, probably a few thousand pages and a ton of PDFs.",
@@ -140,10 +144,6 @@
         {
           "prospect": "We use CivicPlus for our site.",
           "say_this": "Got it. And are you handling the document side separately — PDFs, agendas, public notices? Or is that still on the to-do list?"
-        },
-        {
-          "prospect": "We have thousands of PDFs we need to remediate.",
-          "say_this": "Are you running a separate tool for documents, or is it all manual right now?"
         },
         {
           "prospect": "We need to get this sorted out soon.",
@@ -164,7 +164,7 @@
         "prospect asks about next steps",
         "you have delivered the core value prop"
       ],
-      "instructions": "Connect EqualGround directly to the pain they described. Lead with the gap you found — if they struggle with PDFs, lead with deep PDF remediation. If they use an overlay, lead with source-code-level fixes. Keep it concise. Do NOT dump every feature. Hit the one or two things that matter to THIS prospect. Position EqualGround as the direct answer to what they just told you.",
+      "instructions": "Connect directly to what they just told you. If they're doing it by hand — lead with the fact that EqualGround does the work so they don't have to. If they have years of old PDFs sitting there — lead with bulk remediation and Autopilot. If they have an overlay — lead with the DOJ's position and the PDF gap. Don't pitch features they didn't surface. Mirror their problem back, then explain how it gets solved.",
       "few_shot": [
         {
           "prospect": "So what exactly does your platform do?",

@@ -19,7 +19,7 @@
       "example_responses": [
         "You're right — they just extended it to April 2027 for larger entities. But here's the thing: the DOJ extended it because the work turned out to be harder than expected, not because the requirement went away. The WCAG requirements are identical. Are you further along than you were six months ago?",
         "Yeah the deadline moved to April 2027. The reason it moved is actually the DOJ admitted the compliance work is more complex than they anticipated — which is exactly the challenge EqualGround is built to solve. Where are you in the process right now?",
-        "Correct. And that extra year is genuinely helpful. The question is what you do with it — entities that use this window to actually remediate will be in a completely different position than those that wait again. What does your current status look like?"
+        "Correct. And that extra year is genuinely helpful. The question is what you do with it — counties that use this window to actually get it done will be in a completely different position than those that wait again. Where are you at with it right now?"
       ]
     },
     "already_compliant": {
@@ -92,7 +92,7 @@
       "trigger_phrases": ["too complicated", "too complex", "too sophisticated", "not technical enough", "our team can not use this", "need something simpler", "too advanced", "too much for us", "chevy malibu", "ferrari", "basic solution", "simple solution", "do not have technical staff", "no IT staff", "limited technical"],
       "tactic": "SIMPLIFY AND FOCUS ON AUTOPILOT",
       "instructions": "Validate the concern immediately — never defend the complexity. Then reframe around Autopilot: the platform does the technical work so their team does not have to. The interface looks advanced but the day-to-day workflow for non-technical users is scan, review flagged issues, hit Autopilot. Emphasize that scope-based pricing means they only pay for what they need — not a full enterprise suite.",
-      "context": "Small counties and school districts often have no dedicated IT staff and 50+ non-technical department heads managing web content. They need automation, not a tool requiring expertise. EqualGround Autopilot is specifically designed to remove the manual technical burden. The visual Structural Remediation Max editor is drag-and-drop — no coding required.",
+      "context": "Small counties and school districts often have one person doing everything, or department heads who are not technical at all managing their own content. They don't have time to learn a complex platform. They need something that does the work for them. Autopilot is designed for exactly that — it runs automatically, no technical knowledge needed. Structural Remediation Max uses a visual drag-and-drop editor, no coding required.",
       "example_responses": [
         "Totally fair. The platform has a lot of capability but the day-to-day workflow for your team is actually straightforward — Autopilot handles the technical fixes automatically. Your admins do not need to touch any code. Would it help to walk through just the document side so you can see how simple the actual workflow is?",
         "I hear that a lot. The interface can look like a lot at first. What most non-technical teams actually use is the Autopilot feature — it scans and fixes automatically. Your department heads would not be doing the remediation, the platform does it for them.",
@@ -114,7 +114,7 @@
       "trigger_phrases": ["contract ends", "contract is up", "contract expires", "renewing soon", "evaluating options", "no budget beyond", "budget ends in", "current tool contract", "looking at alternatives", "exploring options"],
       "tactic": "BUYING WINDOW",
       "instructions": "A contract ending is not a budget objection — it is a buying signal disguised as a timing issue. They are actively evaluating. Position EqualGround as the consolidation opportunity: replace their current tool plus any other vendors they are running with one platform. Create urgency around the evaluation timeline.",
-      "context": "Government entities on expiring contracts are in active evaluation mode even if they do not say so. This is the natural replacement window. Entities running Equidox for docs and something else for web are prime consolidation targets — EqualGround replaces both.",
+      "context": "Government entities on expiring contracts are in active evaluation mode even if they do not say so. This is the natural replacement window. Counties running Equidox for documents and something separate for web scanning are the clearest opportunity — EqualGround replaces both in one platform.",
       "example_responses": [
         "So when that contract ends you will be evaluating what comes next. That is actually perfect timing — EqualGround covers both the document side and web scanning in one platform. Are you also running a separate tool for the web side? Because that is usually where the consolidation opportunity is.",
         "When does the contract end exactly? The reason I ask is we can usually time the quote and implementation around that window so there is no gap in coverage and you are not paying for overlap.",
