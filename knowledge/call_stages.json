@@ -13,27 +13,31 @@
         "prospect introduces themselves as the right contact",
         "prospect asks what this is about after being transferred"
       ],
-      "instructions": "Lead with the specific scan score — always reference the actual AA percentage from the pre-call scan. This is your reason for calling and your credibility hook in one line. If asked what company you are with, say YuJa and immediately pivot back to the compliance question. Do NOT pitch EqualGround by name yet. Do NOT mention features. Your only goal is the transfer to the right person.",
+      "instructions": "Your only goal here is to get transferred to the right person. Keep it short and friendly — you're looking for whoever handles the county's website accessibility. Don't mention the scan, don't mention EqualGround, don't pitch anything. If they're not sure who handles it, help them narrow it down — IT director, webmaster, whoever manages the website. When they say they'll transfer you, ask for the person's name before you get put on hold. If you get dropped, you can call back and ask for them directly.",
       "few_shot": [
         {
           "prospect": "Thank you for calling, how can I help you?",
-          "say_this": "Hi, I ran a scan of your homepage using our accessibility platform and it came back as non-compliant under the new Title II guidelines — I was hoping to speak with someone who oversees that. How are you guys approaching that?"
+          "say_this": "Hi, I'm hoping you can help me out — I'm looking to speak with whoever oversees the county's website accessibility."
         },
         {
-          "prospect": "What company are you with?",
-          "say_this": "YuJa — I just wanted to learn more about how you guys are approaching the compliance side."
+          "prospect": "I'm not sure who that would be.",
+          "say_this": "It'd probably be someone like your IT director or whoever manages the website — does that ring a bell?"
         },
         {
           "prospect": "What is this regarding?",
-          "say_this": "I ran a scan of your website and it flagged some Title II compliance issues — wanted to connect with whoever handles that."
+          "say_this": "I ran a scan on your site and wanted to share what I found with whoever handles that."
         },
         {
-          "prospect": "That would be our IT director. Let me transfer you.",
-          "say_this": "That would be great, thank you."
+          "prospect": "Sure, I can transfer you.",
+          "say_this": "That would be great — who would I be speaking with? Just so I know who to ask for."
         },
         {
-          "prospect": "We already handle that.",
-          "say_this": "Good to hear. Who on your team would be the right person to connect with about it? I just wanted to share what the scan found."
+          "prospect": "That would be Mike in IT.",
+          "say_this": "Perfect, thank you."
+        },
+        {
+          "prospect": "We handle that ourselves.",
+          "say_this": "Great — would you be the right person to connect with about it, or is there someone else on your team?"
         }
       ]
     },
@@ -49,8 +53,12 @@
         "prospect confirms their role",
         "prospect asks what you found or what's going on"
       ],
-      "instructions": "Confirm you are talking to the right person. Reference that you were directed to them. Be conversational and brief. If they confirm, immediately transition to credibility.",
+      "instructions": "Open with their name if you got it from the gatekeeper — it immediately sounds like a warm transfer, not a cold call. Confirm you're talking to the right person, reference that you were directed to them, and be brief. If they confirm, move straight to credibility.",
       "few_shot": [
+        {
+          "prospect": "This is Mike.",
+          "say_this": "Hey Mike, I was just speaking with your front desk — they directed me to you for the website accessibility side of things. Is that something you handle?"
+        },
         {
           "prospect": "This is Mike, what can I do for you?",
           "say_this": "Hey Mike. I was directed to you as the best person to talk to about the county's website accessibility. Is that something you handle?"
