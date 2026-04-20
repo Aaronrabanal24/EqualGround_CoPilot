@@ -249,8 +249,10 @@ export default function Home() {
         mediaStreamRef.current = micStream;
         systemStreamRef.current = new MediaStream(systemAudioTracks);
 
-        // 3. Merge into stereo: left=mic (rep), right=system (prospect)
+        // 3. Merge into stereo via AudioWorklet (off main thread)
         const audioContext = new AudioContext({ sampleRate: 16000 });
+        await audioContext.audioWorklet.addModule("/audio-processor.js");
+
         const micSource = audioContext.createMediaStreamSource(micStream);
         const systemSource = audioContext.createMediaStreamSource(new MediaStream(systemAudioTracks));
 
@@ -258,44 +260,16 @@ export default function Home() {
         micSource.connect(merger, 0, 0);     // mic → left channel (ch0)
         systemSource.connect(merger, 0, 1);  // system → right channel (ch1)
 
-        // Use ScriptProcessor to extract stereo PCM
-        const processor = audioContext.createScriptProcessor(4096, 2, 2);
-        merger.connect(processor);
-        processor.connect(audioContext.destination);
+        const workletNode = new AudioWorkletNode(audioContext, "stereo-audio-processor", {
+          channelCount: 2,
+          channelCountMode: "explicit",
+        });
+        merger.connect(workletNode);
+        workletNode.connect(audioContext.destination);
 
-        let audioBuffer: Int16Array[] = [];
-        let sampleCount = 0;
-        const samplesPerChunk = 16000 / 4; // 250ms at 16kHz
-
-        processor.onaudioprocess = (e) => {
-          if (!mediaRecorderRef.current) return;
-          const left = e.inputBuffer.getChannelData(0);   // mic (rep)
-          const right = e.inputBuffer.getChannelData(1);   // system (prospect)
-
-          // Interleave into stereo int16: [L0, R0, L1, R1, ...]
-          const interleaved = new Int16Array(left.length * 2);
-          for (let i = 0; i < left.length; i++) {
-            const lSample = Math.max(-1, Math.min(1, left[i]));
-            const rSample = Math.max(-1, Math.min(1, right[i]));
-            interleaved[i * 2] = lSample < 0 ? lSample * 0x8000 : lSample * 0x7fff;
-            interleaved[i * 2 + 1] = rSample < 0 ? rSample * 0x8000 : rSample * 0x7fff;
-          }
-          audioBuffer.push(interleaved);
-          sampleCount += left.length;
-
-          if (sampleCount >= samplesPerChunk) {
-            const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
-            const merged = new Int16Array(totalLen);
-            let offset = 0;
-            for (const chunk of audioBuffer) {
-              merged.set(chunk, offset);
-              offset += chunk.length;
-            }
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(merged.buffer);
-            }
-            audioBuffer = [];
-            sampleCount = 0;
+        workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(event.data);
           }
         };
 
@@ -305,7 +279,8 @@ export default function Home() {
         }
 
         mediaRecorderRef.current = { stop: () => {
-          processor.disconnect();
+          workletNode.port.close();
+          workletNode.disconnect();
           merger.disconnect();
           micSource.disconnect();
           systemSource.disconnect();
@@ -332,45 +307,23 @@ export default function Home() {
         }
 
         const audioContext = new AudioContext({ sampleRate: 16000 });
+        await audioContext.audioWorklet.addModule("/audio-processor.js");
+
         const source = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        const workletNode = new AudioWorkletNode(audioContext, "mono-audio-processor");
 
-        let audioBuffer: Int16Array[] = [];
-        let sampleCount = 0;
-        const samplesPerChunk = 16000 / 4;
+        source.connect(workletNode);
+        workletNode.connect(audioContext.destination);
 
-        processor.onaudioprocess = (e) => {
-          if (!mediaRecorderRef.current) return;
-          const float32 = e.inputBuffer.getChannelData(0);
-          const int16 = new Int16Array(float32.length);
-          for (let i = 0; i < float32.length; i++) {
-            const s = Math.max(-1, Math.min(1, float32[i]));
-            int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-          }
-          audioBuffer.push(int16);
-          sampleCount += int16.length;
-
-          if (sampleCount >= samplesPerChunk) {
-            const totalLen = audioBuffer.reduce((a, b) => a + b.length, 0);
-            const merged = new Int16Array(totalLen);
-            let offset = 0;
-            for (const chunk of audioBuffer) {
-              merged.set(chunk, offset);
-              offset += chunk.length;
-            }
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(merged.buffer);
-            }
-            audioBuffer = [];
-            sampleCount = 0;
+        workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(event.data);
           }
         };
 
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-
         mediaRecorderRef.current = { stop: () => {
-          processor.disconnect();
+          workletNode.port.close();
+          workletNode.disconnect();
           source.disconnect();
           audioContext.close();
         }} as unknown as MediaRecorder;
