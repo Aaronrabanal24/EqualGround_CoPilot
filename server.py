@@ -595,11 +595,9 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                     if audio_mode == "stereo":
                         # Channel 0 = mic (Rep), Channel 1 = system (Prospect)
                         is_prospect = (ch == 1)
-                        speaker = "Prospect" if is_prospect else "You"
                     else:
                         # Mono mode: everything treated as Prospect (legacy behavior)
                         is_prospect = True
-                        speaker = "Prospect"
 
                     if is_final and transcript:
                         if is_prospect:
@@ -607,25 +605,31 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                         else:
                             rep_buffer += transcript + " "
 
-                        # Send confirmed text to frontend for live display
-                        if websocket.client_state == WebSocketState.CONNECTED:
-                            await websocket.send_json({
-                                "type": "transcript",
-                                "speaker": speaker,
-                                "text": transcript,
-                            })
-
                     # "Speech Final" = speaker finished their thought
                     if speech_final:
                         if is_prospect and prospect_buffer.strip():
                             complete_thought = prospect_buffer.strip()
                             logger.debug("  PROSPECT UTTERANCE: %s", sanitize_for_log(complete_thought))
-                            await transcript_queue.put(complete_thought)
+                            # Send the FULL utterance to frontend (not per-fragment)
+                            if websocket.client_state == WebSocketState.CONNECTED:
+                                await websocket.send_json({
+                                    "type": "transcript",
+                                    "speaker": "Prospect",
+                                    "text": complete_thought,
+                                })
+                            # Only trigger coaching if the utterance is substantive
+                            if len(complete_thought.split()) >= 5:
+                                await transcript_queue.put(complete_thought)
                             prospect_buffer = ""
                         elif not is_prospect and rep_buffer.strip():
-                            # Log rep speech to history for context, but don't trigger coaching
                             rep_text = rep_buffer.strip()
                             logger.debug("  REP UTTERANCE: %s", sanitize_for_log(rep_text))
+                            if websocket.client_state == WebSocketState.CONNECTED:
+                                await websocket.send_json({
+                                    "type": "transcript",
+                                    "speaker": "You",
+                                    "text": rep_text,
+                                })
                             call_history.append({"role": "assistant_voice", "content": rep_text})
                             rep_buffer = ""
 

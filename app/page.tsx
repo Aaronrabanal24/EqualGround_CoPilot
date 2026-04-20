@@ -79,8 +79,7 @@ export default function Home() {
   const [summary, setSummary] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [prevSayThis, setPrevSayThis] = useState("");
-  const [sayThisKey, setSayThisKey] = useState(0);
+
   const [interimText, setInterimText] = useState("");
   const [audioMode, setAudioMode] = useState<"mic" | "system">("system");
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -114,13 +113,6 @@ export default function Home() {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcripts]);
 
-  // Animate panel on change
-  useEffect(() => {
-    if (navigation.prospect_signal !== prevSayThis) {
-      setPrevSayThis(navigation.prospect_signal);
-      setSayThisKey((k) => k + 1);
-    }
-  }, [navigation.prospect_signal, prevSayThis]);
 
   useEffect(() => {
     let cancelled = false;
@@ -621,13 +613,13 @@ export default function Home() {
         )}
 
         {/* Advisor Panel */}
-        <div key={sayThisKey} className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar teleprompter-fade">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
 
           {/* Prospect Signal */}
           {navigation.prospect_signal && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-1.5">Prospect Signal</p>
-              <p className="text-sm leading-relaxed text-gray-300">{navigation.prospect_signal}</p>
+              <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out">{navigation.prospect_signal}</p>
             </div>
           )}
 
@@ -635,7 +627,7 @@ export default function Home() {
           {navigation.insight && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1.5">Insight</p>
-              <p className="text-sm leading-relaxed text-gray-300">{navigation.insight}</p>
+              <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out">{navigation.insight}</p>
             </div>
           )}
 
@@ -645,7 +637,7 @@ export default function Home() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">Talking Points</p>
               <ul className="space-y-2">
                 {navigation.talking_points.map((point, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
+                  <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
                     <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
                     <span className="text-base font-medium leading-relaxed text-white">{point}</span>
                   </li>
