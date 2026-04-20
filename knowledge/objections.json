@@ -87,6 +87,50 @@
         "No worries at all. When would be a better window? I'm flexible — even a 15-minute call works. I'll send you the scan results ahead of time so we can be efficient with your time.",
         "Understood. Could I reach back out Thursday or Friday? It'll be brief — 15 minutes max. I'll have the scan results from your site ready to walk through."
       ]
+    },
+    "too_complex": {
+      "trigger_phrases": ["too complicated", "too complex", "too sophisticated", "not technical enough", "our team can not use this", "need something simpler", "too advanced", "too much for us", "chevy malibu", "ferrari", "basic solution", "simple solution", "do not have technical staff", "no IT staff", "limited technical"],
+      "tactic": "SIMPLIFY AND FOCUS ON AUTOPILOT",
+      "instructions": "Validate the concern immediately — never defend the complexity. Then reframe around Autopilot: the platform does the technical work so their team does not have to. The interface looks advanced but the day-to-day workflow for non-technical users is scan, review flagged issues, hit Autopilot. Emphasize that scope-based pricing means they only pay for what they need — not a full enterprise suite.",
+      "context": "Small counties and school districts often have no dedicated IT staff and 50+ non-technical department heads managing web content. They need automation, not a tool requiring expertise. EqualGround Autopilot is specifically designed to remove the manual technical burden. The visual Structural Remediation Max editor is drag-and-drop — no coding required.",
+      "example_responses": [
+        "Totally fair. The platform has a lot of capability but the day-to-day workflow for your team is actually straightforward — Autopilot handles the technical fixes automatically. Your admins do not need to touch any code. Would it help to walk through just the document side so you can see how simple the actual workflow is?",
+        "I hear that a lot. The interface can look like a lot at first. What most non-technical teams actually use is the Autopilot feature — it scans and fixes automatically. Your department heads would not be doing the remediation, the platform does it for them.",
+        "Makes sense. Let me focus on what matters for your team — bulk scanning identifies everything, Autopilot fixes what it can automatically, and the remaining items are flagged for review with suggested fixes. No coding required. Does that feel more manageable?"
+      ]
+    },
+    "cant_modify_cms": {
+      "trigger_phrases": ["can not modify the code", "cannot modify", "locked down", "vendor manages our site", "civicplus manages", "we do not control the code", "our vendor controls", "do not have access to the code", "cms is locked", "vendor does not allow", "we use a managed cms"],
+      "tactic": "CMS INDEPENDENCE PIVOT",
+      "instructions": "This is actually an advantage for EqualGround, not an obstacle. The HTML download and re-upload workflow means web remediation does not require direct CMS access. Document remediation is completely outside the CMS entirely. Reframe: EqualGround works alongside their CMS vendor, not inside it.",
+      "context": "Most government entities use managed CMS platforms like CivicPlus, Revise, or similar where they cannot directly modify code. EqualGround remediates web pages by downloading HTML, fixing it, and re-uploading. Document remediation is entirely CMS-independent. This is a universal government IT constraint and EqualGround is specifically designed to work around it.",
+      "example_responses": [
+        "That is actually how most counties are set up. EqualGround does not need to touch your CMS directly — for web pages it downloads the HTML, remediates it, and you re-upload. For documents it is completely separate from your CMS. Does that workflow make sense for how your team operates?",
+        "Most of the counties we work with are in the same situation with CivicPlus or similar. The way EqualGround handles it is outside the CMS — so your vendor relationship stays exactly the same. The remediation happens on our platform and you push the fixes back.",
+        "Actually that is not an obstacle at all. EqualGround is designed to work alongside managed CMS platforms, not inside them. The document side especially is completely CMS-independent."
+      ]
+    },
+    "contract_ending": {
+      "trigger_phrases": ["contract ends", "contract is up", "contract expires", "renewing soon", "evaluating options", "no budget beyond", "budget ends in", "current tool contract", "looking at alternatives", "exploring options"],
+      "tactic": "BUYING WINDOW",
+      "instructions": "A contract ending is not a budget objection — it is a buying signal disguised as a timing issue. They are actively evaluating. Position EqualGround as the consolidation opportunity: replace their current tool plus any other vendors they are running with one platform. Create urgency around the evaluation timeline.",
+      "context": "Government entities on expiring contracts are in active evaluation mode even if they do not say so. This is the natural replacement window. Entities running Equidox for docs and something else for web are prime consolidation targets — EqualGround replaces both.",
+      "example_responses": [
+        "So when that contract ends you will be evaluating what comes next. That is actually perfect timing — EqualGround covers both the document side and web scanning in one platform. Are you also running a separate tool for the web side? Because that is usually where the consolidation opportunity is.",
+        "When does the contract end exactly? The reason I ask is we can usually time the quote and implementation around that window so there is no gap in coverage and you are not paying for overlap.",
+        "Got it. So you are actively evaluating right now. Most counties in that situation end up consolidating — one vendor for web and documents instead of two separate tools. Would it make sense to see what EqualGround looks like scope-wise before you commit to renewing anything?"
+      ]
+    },
+    "bulk_remediation": {
+      "trigger_phrases": ["bulk remediation", "automate all documents", "do them all at once", "automatically fix everything", "does it do it automatically", "how many can it do at once", "still have to review each one", "manual work", "one by one", "how automated is it", "do we have to touch each document"],
+      "tactic": "CLARIFY AND REFRAME",
+      "instructions": "Do not say no to bulk remediation — that is incomplete and loses credibility. Bulk scanning is fully automated across the entire document library. Autopilot handles straightforward documents without any manual intervention. Structural Remediation Max handles complex documents with AI suggestions the user confirms. Reframe manual confirmation as a protection feature for sensitive government documents, not a limitation.",
+      "context": "EqualGround Structural Remediation Max supports batch processing and queue management for entire document collections. Autopilot handles straightforward documents automatically with no manual intervention. Complex documents (tables, reading order issues, redacted content, commissioner agendas) use AI-assisted Structural Remediation Max where users confirm AI suggestions. 80-90% of typical government document backlogs clear automatically. The confirmation step prevents incorrect auto-fixes on sensitive government documents.",
+      "example_responses": [
+        "Great question. Bulk scanning runs automatically across your entire document library and scores everything. For straightforward documents Autopilot applies fixes without you touching them. For complex ones — like commissioner agendas with tables — Structural Remediation Max gives you a visual editor with AI suggestions you confirm. You are not starting from scratch, you are reviewing what the AI already did.",
+        "The bulk scanning piece is fully automated — it will run through all your documents and prioritize by severity. The confirmation step only kicks in for complex documents, which for a typical government library is maybe 10-20% of the total. The rest clears automatically.",
+        "So the way it works: Autopilot handles the simple fixes automatically. Structural Remediation Max is for your harder documents — tables, reading order, redacted content. It is AI-assisted, not manual from scratch. Most clients clear 80-90% of their backlog without touching individual documents."
+      ]
     }
   }
 }

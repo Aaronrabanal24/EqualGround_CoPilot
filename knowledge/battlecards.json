@@ -3,23 +3,47 @@
     "overlay": {
       "names": ["AudioEye", "UserWay", "AccessiBe", "EqualWeb"],
       "trigger_phrases": ["overlay", "widget", "audioeye", "userway", "accessibe", "equalweb", "plugin", "toolbar"],
-      "their_flaw": "Overlays do NOT change source code. The DOJ has explicitly stated overlays do not guarantee compliance. They are a cosmetic layer that sits on top — the underlying code is still broken. Plaintiff attorneys actively target sites with overlays because it shows awareness without action.",
+      "their_flaw": "Overlays do NOT change source code. The DOJ has explicitly stated overlays do not guarantee compliance. They are a cosmetic layer that sits on top — the underlying code is still broken. Plaintiff attorneys actively target sites with overlays because it shows awareness without action. Overlays also cannot touch PDF documents at all — and government sites typically have thousands of PDFs that are separately required to be accessible under Title II.",
       "our_pivot": "Widgets actually act as a beacon for lawsuits. EqualGround fixes the root code and handles your PDFs — overlays can't touch PDFs.",
       "example_responses": [
         "So overlays like AudioEye sit on top of your site but don't actually change the underlying code. The DOJ has said that doesn't count. Are you seeing it catch everything, or are there gaps?",
         "Yeah a lot of folks start with an overlay. The issue is it doesn't fix PDFs and the DOJ doesn't consider it compliant. How's it been working for the document side of things?",
-        "Got it. So the challenge with widgets is they don't remediate at the source level. EqualGround actually fixes the code and auto-remediates PDFs, which is usually the biggest gap."
+        "Got it. So the challenge with widgets is they don't remediate at the source level. EqualGround actually fixes the code and auto-remediates PDFs, which is usually the biggest gap.",
+        "And how about your documents — PDFs, agendas, board minutes? AudioEye cannot touch those. That is usually the bigger gap for government sites."
       ]
     },
     "civicplus_granicus": {
       "names": ["CivicPlus", "Granicus", "CivicEngage"],
       "trigger_phrases": ["civicplus", "granicus", "civicengage", "website builder", "website vendor", "cms vendor", "our website company"],
-      "their_flaw": "Great at building and hosting government websites, but terrible at parsing and remediating historical PDFs. They build the house but don't clean the closets.",
+      "their_flaw": "Great at building and hosting government websites, but terrible at parsing and remediating historical PDFs. They build the house but don't clean the closets. Their accessibility features cover web pages only — the PDF and document backlog is completely unaddressed.",
       "our_pivot": "Great for hosting. Most folks actually use EqualGround alongside them — CivicPlus handles the site, EqualGround handles the heavy lifting on PDF remediation and deep compliance.",
       "example_responses": [
         "CivicPlus is solid for the site itself. Most of our customers actually use us alongside them — CivicPlus handles the hosting and EqualGround handles the PDF remediation and deep scan. Are they covering the document side for you?",
         "Yeah Granicus does a great job on the web side. The gap we usually see is with the thousands of historical PDFs that need to be tagged and remediated. Is that something they're handling for you?",
-        "Good. So the way most counties set it up is CivicPlus runs the site and EqualGround sits behind it scanning and fixing the underlying accessibility issues. Especially the document backlog."
+        "Good. So the way most counties set it up is CivicPlus runs the site and EqualGround sits behind it scanning and fixing the underlying accessibility issues. Especially the document backlog.",
+        "Does CivicPlus cover your documents too — PDFs, agendas, public notices? That is usually the gap. They handle the site but the document remediation piece is completely separate."
+      ]
+    },
+    "equidox": {
+      "names": ["Equidox"],
+      "trigger_phrases": ["equidox", "we use equidox", "document remediation tool", "separate document tool", "our doc tool", "pdf remediation software", "pdf tool", "document tool", "pdf software"],
+      "their_flaw": "PDF and document remediation only — no web scanning at all. Customers always need a second vendor for web accessibility. Batch processing works well for templated documents but complex government PDFs (commissioner agendas, redacted content, mixed layouts) still require heavy manual work. Priced per page/per user which gets expensive at scale.",
+      "our_pivot": "EqualGround replaces Equidox AND your web scanner in one platform. Structural Remediation Max handles complex PDFs with AI-assisted bulk remediation including tables, reading order, and redacted content. Scope-based pricing covers everything — web pages, documents, alternative formats (EPUB, Braille, audio). When their Equidox contract is up, that is the consolidation moment.",
+      "example_responses": [
+        "So Equidox is documents only — you would still need something separate for the web side. EqualGround handles both in one platform. When does your Equidox contract renew? That is usually the natural point where it makes sense to consolidate.",
+        "How has Equidox been handling your complex documents — the commissioner agendas, tables, redacted content? Our Structural Remediation Max is specifically built for those. AI does the heavy lifting and you confirm.",
+        "A lot of counties we work with ran Equidox for docs and something else for web. When the contract came up they moved everything to EqualGround — one vendor, one workflow, one quote. Are you also running a separate tool for the web side?"
+      ]
+    },
+    "acquia": {
+      "names": ["Acquia"],
+      "trigger_phrases": ["acquia", "our cms has scanning", "built-in scanner", "cms scanner", "our website platform scans", "acquia accessibility"],
+      "their_flaw": "Acquia is a CMS hosting platform — accessibility is a bolt-on feature, not their core product. Known for false positives and functionality that gets removed between versions. You are paying for a full CMS platform to get a secondary accessibility scanning feature that is not purpose-built for compliance.",
+      "our_pivot": "EqualGround is purpose-built for accessibility compliance — not a CMS that added scanning as a feature. Lower false positive rate, purpose-built reporting for Title II, and covers documents which Acquia does not.",
+      "example_responses": [
+        "How has Acquia been working for you on the accessibility side? We hear a lot about false positives being an issue — is that something you have run into?",
+        "Acquia is great for hosting. The accessibility piece is more of an add-on for them. EqualGround is purpose-built just for compliance — lower false positives, better document coverage, and reporting designed for Title II specifically.",
+        "So the challenge with CMS-based scanners is they are designed around the hosting platform, not around compliance. EqualGround covers your full digital footprint including documents, which most CMS tools cannot touch."
       ]
     },
     "siteimprove": {

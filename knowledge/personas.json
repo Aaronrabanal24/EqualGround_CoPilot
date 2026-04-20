@@ -53,6 +53,43 @@
         "Who on your team is closest to the technical side of this?"
       ],
       "pivot_to": "Cost of a DOJ lawsuit vs. cost of proactive compliance. Emphasize risk mitigation and that EqualGround is a fraction of the cost of a single lawsuit."
+    },
+    "small_county_no_it": {
+      "titles": ["County Clerk", "County Administrator", "Office Manager", "Department Head", "Web Coordinator"],
+      "trigger_phrases": ["no IT staff", "limited budget", "small county", "small town", "15000 budget", "do not have a developer", "one person handles", "we all wear many hats", "part time", "not technical"],
+      "theme": "Simplicity, automation, affordability, no technical expertise available",
+      "pain_points": [
+        "No dedicated IT staff — one person handles everything",
+        "Annual tech budget under $15,000",
+        "50+ non-technical department heads managing web content",
+        "Using a managed CMS like CivicPlus — cannot modify code",
+        "Needs the platform to do the work, not just flag issues"
+      ],
+      "discovery_questions": [
+        "How many people on your team are handling the web and document side of things?",
+        "Are you using a managed platform like CivicPlus where your vendor controls the code?",
+        "What does your annual technology budget look like for something like this?",
+        "Is the concern more about the document backlog or the ongoing web scanning?"
+      ],
+      "pivot_to": "Autopilot and simplicity. Do not demo the full platform. Focus on: scan runs automatically, Autopilot fixes what it can, flags the rest with suggested fixes. Non-technical team does not need to touch code. Scope-based pricing means they only pay for their actual footprint — 100 pages and 5,000 docs is a very manageable quote."
+    },
+    "commissioner_driven_buyer": {
+      "titles": ["IT Director", "County Administrator", "IS Manager", "Web Manager"],
+      "trigger_phrases": ["commissioners meeting", "board meeting", "need to present", "present to the board", "council meeting", "need a quote by", "need pricing by", "present options", "board needs to approve", "council needs to approve"],
+      "theme": "Board approval required, needs quote format for non-technical presentation, real deadline driven by meeting schedule",
+      "pain_points": [
+        "Cannot make purchase decisions alone — needs board or commissioners approval",
+        "Needs a quote in a specific format to present at an upcoming meeting",
+        "Board members are non-technical — needs simple ROI framing not feature lists",
+        "Meeting schedule creates a real hard deadline for the quote"
+      ],
+      "discovery_questions": [
+        "Do you have a commissioners or board meeting coming up where this would need to be presented?",
+        "What does the board typically need to see to approve something like this — is it mainly the cost and compliance risk?",
+        "Who else besides you would be involved in making this decision?",
+        "What is the timeline you are working with to have something ready for them?"
+      ],
+      "pivot_to": "Create urgency around the board meeting date. Offer to prepare the quote in a format the rep can present directly to non-technical commissioners — cost, compliance risk, deadline context, and ROI framing. Ask for the meeting date and work backwards. This is a real hard deadline, not a soft one."
     }
   }
 }

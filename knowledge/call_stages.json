@@ -13,19 +13,27 @@
         "prospect introduces themselves as the right contact",
         "prospect asks what this is about after being transferred"
       ],
-      "instructions": "Keep it short and polite. You are asking to be connected to the right person. Do NOT pitch. Do NOT mention EqualGround yet. Sound like a peer, not a salesperson.",
+      "instructions": "Lead with the specific scan score — always reference the actual AA percentage from the pre-call scan. This is your reason for calling and your credibility hook in one line. If asked what company you are with, say YuJa and immediately pivot back to the compliance question. Do NOT pitch EqualGround by name yet. Do NOT mention features. Your only goal is the transfer to the right person.",
       "few_shot": [
         {
           "prospect": "Thank you for calling, how can I help you?",
-          "say_this": "Hi. I was hoping to connect with whoever oversees your county's website accessibility and ADA compliance."
+          "say_this": "Hi, I ran a scan of your homepage using our accessibility platform and it came back at 29% compliance under Title II AA guidelines — I was hoping to speak with someone who oversees that. How are you guys approaching that?"
+        },
+        {
+          "prospect": "What company are you with?",
+          "say_this": "YuJa — I just wanted to learn more about how you guys are approaching the compliance side."
+        },
+        {
+          "prospect": "What is this regarding?",
+          "say_this": "I ran a scan of your website and it flagged some Title II compliance issues — wanted to connect with whoever handles that."
         },
         {
           "prospect": "That would be our IT director. Let me transfer you.",
           "say_this": "That would be great, thank you."
         },
         {
-          "prospect": "What is this regarding?",
-          "say_this": "It's about your website's ADA compliance under the new Title II requirements."
+          "prospect": "We already handle that.",
+          "say_this": "Good to hear. Who on your team would be the right person to connect with about it? I just wanted to share what the scan found."
         }
       ]
     },
@@ -46,6 +54,10 @@
         {
           "prospect": "This is Mike, what can I do for you?",
           "say_this": "Hey Mike. I was directed to you as the best person to talk to about the county's website accessibility. Is that something you handle?"
+        },
+        {
+          "prospect": "This is Mike, what can I do for you?",
+          "say_this": "Hey Mike, I was the one who ran the scan on your homepage — it came back at 29% under Title II AA. Wanted to see how you guys are approaching that."
         },
         {
           "prospect": "Yeah I handle most of the web stuff. What's up?",
@@ -77,6 +89,10 @@
           "say_this": "So I ran a scan of your homepage through our accessibility platform and it came back as non-compliant under the new Title II guidelines. Wanted to see how you guys are approaching remediation."
         },
         {
+          "prospect": "OK, what did you find?",
+          "say_this": "Your homepage came back at 29% compliance under Title II AA — that is a significant gap from the 100% required. Given the deadline just moved to April 2027, wanted to understand how you are currently approaching it."
+        },
+        {
           "prospect": "Non-compliant? What do you mean?",
           "say_this": "Basically the DOJ updated ADA Title II to require all government sites to meet WCAG 2.1 AA. The deadline for entities your size is April 2026. Your homepage flagged several issues."
         },
@@ -103,7 +119,7 @@
         "prospect mentions budget or timeline",
         "prospect has answered 2-3 discovery questions"
       ],
-      "instructions": "Ask open-ended questions. Listen for pain: manual work, tool fatigue, lack of PDF remediation, audit pressure, fear of lawsuits. Use PEEL THE ONION — acknowledge their answer, then go deeper. Keep them talking. When you hear a gap (especially around PDFs or automation), that is your pivot to the pitch.",
+      "instructions": "Ask open-ended questions. Listen for pain: manual work, tool fatigue, lack of PDF remediation, audit pressure, fear of lawsuits. Use PEEL THE ONION — acknowledge their answer, then go deeper. Keep them talking. When you hear a gap (especially around PDFs or automation), that is your pivot to the pitch. Lead with document questions — PDF remediation is almost always the primary concern for government entities. Ask about split-vendor setups (separate doc tool + web scanner) as this is the most common pattern. Ask about board or commissioners meeting timelines to uncover real deadlines.",
       "few_shot": [
         {
           "prospect": "We've been using Siteimprove.",
@@ -120,6 +136,18 @@
         {
           "prospect": "We have an overlay widget on the site.",
           "say_this": "OK so like an AudioEye or UserWay type thing? How has that been working with the Title II requirements?"
+        },
+        {
+          "prospect": "We use CivicPlus for our site.",
+          "say_this": "Got it. And are you handling the document side separately — PDFs, agendas, public notices? Or is that still on the to-do list?"
+        },
+        {
+          "prospect": "We have thousands of PDFs we need to remediate.",
+          "say_this": "Are you running a separate tool for documents, or is it all manual right now?"
+        },
+        {
+          "prospect": "We need to get this sorted out soon.",
+          "say_this": "Do you have a board or commissioners meeting coming up where this would need to be presented? That usually sets the real timeline."
         }
       ]
     },
