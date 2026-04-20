@@ -561,7 +561,7 @@ export default function Home() {
   };
 
   const activeNavigation = appMode === "guide" ? guideNavigation : navigation;
-  const rawStageNum = Number.parseInt(activeNavigation?.stage_progress?.split("/")[0] ?? "", 10);
+  const rawStageNum = Number.parseInt(activeNavigation?.stage_progress?.split("/")[0] ?? "1", 10);
   const currentStageNum = Number.isFinite(rawStageNum) && rawStageNum > 0 ? rawStageNum : 1;
   const showListeningPlaceholder = appMode === "live" && !!activeNavigation && activeNavigation.talking_points.length === 0 && !activeNavigation.insight;
 
@@ -806,19 +806,22 @@ export default function Home() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
-                  {guideTab === "stages" && stages.map((stage) => (
-                    <button
-                      key={stage.id}
-                      onClick={() => mapToStageNavigation(stage)}
-                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
-                        selectedGuideItem?.tab === "stages" && selectedGuideItem.key === stage.id
-                          ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
-                          : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                      }`}
-                    >
-                      {stage.order} · {STAGE_LABELS[(stage.order ?? 1) - 1] ?? stage.name}
-                    </button>
-                  ))}
+                  {guideTab === "stages" && stages.map((stage) => {
+                    const displayOrder = stage.order >= 1 && stage.order <= STAGE_LABELS.length ? stage.order : 1;
+                    return (
+                      <button
+                        key={stage.id}
+                        onClick={() => mapToStageNavigation(stage)}
+                        className={`w-full px-4 py-3 text-left text-sm transition-colors ${
+                          selectedGuideItem?.tab === "stages" && selectedGuideItem.key === stage.id
+                            ? "bg-blue-600/15 border-l-2 border-blue-500 text-white"
+                            : "bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white"
+                        }`}
+                      >
+                        {displayOrder} · {STAGE_LABELS[displayOrder - 1] ?? stage.name}
+                      </button>
+                    );
+                  })}
 
                   {guideTab === "objections" && GUIDE_OBJECTION_GROUPS.map((group) => (
                     <div key={group.label}>
