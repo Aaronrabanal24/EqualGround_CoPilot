@@ -83,12 +83,31 @@ export default function Home() {
   const [sayThisKey, setSayThisKey] = useState(0);
   const [interimText, setInterimText] = useState("");
   const [audioMode, setAudioMode] = useState<"mic" | "system">("system");
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("default");
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const systemStreamRef = useRef<MediaStream | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Enumerate audio input devices (re-enumerate on hotplug)
+  useEffect(() => {
+    const enumerate = () =>
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        setAudioDevices(devices.filter((d) => d.kind === "audioinput"));
+      });
+
+    // Prompt mic permission so device labels are available
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((s) => { s.getTracks().forEach((t) => t.stop()); enumerate(); })
+      .catch(() => enumerate());
+
+    navigator.mediaDevices.addEventListener("devicechange", enumerate);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", enumerate);
+  }, []);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -292,6 +311,7 @@ export default function Home() {
         // ── MIC-ONLY MODE (testing/demo) ──
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
+            deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
             echoCancellation: false,
             noiseSuppression: false,
             autoGainControl: false,
@@ -338,7 +358,7 @@ export default function Home() {
         alert("Microphone access denied or unavailable.");
       }
     }
-  }, [isListening, audioMode]);
+  }, [isListening, audioMode, selectedDeviceId]);
 
   const endCall = useCallback(() => {
     mediaRecorderRef.current?.stop();
@@ -481,8 +501,24 @@ export default function Home() {
                 </button>
               </div>
               <span className="text-[10px] text-gray-600">
-                {audioMode === "system" ? "Captures prospect from your call app" : "For testing — mic labels as Prospect"}
+                {audioMode === "system" ? "Captures prospect from your call app" : "Select the device receiving call audio"}
               </span>
+            </div>
+          )}
+          {audioMode === "mic" && !isListening && (
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Device</span>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs text-gray-300"
+              >
+                {audioDevices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Microphone ${device.deviceId.slice(0, 6)}`}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
           <div className="flex gap-3">
