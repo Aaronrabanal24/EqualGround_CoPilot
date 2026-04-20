@@ -70,7 +70,7 @@
         "prospect mentions their current approach or tool",
         "prospect asks how to fix it"
       ],
-      "instructions": "Reference the accessibility scan you ran on their homepage AND the recent DOJ deadline extension. The DOJ just extended the deadline to April 2027, which means most prospects will feel relieved — your job is to reframe: the extension was granted because compliance is harder than expected, not because it went away. The substantive requirements are unchanged and private right of action still exists. Be matter-of-fact, not alarming. This builds authority — you know the details of the IFR and they probably don't.",
+      "instructions": "Reference the accessibility scan you ran on their homepage AND the recent DOJ deadline extension. The DOJ just extended the deadline to April 26, 2027, which means most prospects will feel relieved — your job is to reframe: the extension was granted because compliance is harder than expected, not because it went away. The substantive requirements are unchanged and private right of action still exists. Be matter-of-fact, not alarming. This builds authority — you know the details of the IFR and they probably don't.",
       "few_shot": [
         {
           "prospect": "OK, what did you find?",
