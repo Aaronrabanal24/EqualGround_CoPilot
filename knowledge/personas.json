@@ -8,15 +8,15 @@
         "Manual remediation eating up staff time",
         "Too many tools and not enough integration",
         "New content breaking compliance as fast as they fix it",
-        "No bandwidth for PDF backlog"
+        "Years of old PDFs — meeting minutes, agendas, public notices — that nobody has had time to get to"
       ],
       "discovery_questions": [
         "How much of your team's time is going into accessibility remediation right now?",
         "Are you fixing things manually or do you have something automated?",
-        "What's the PDF situation look like — are those being handled too?",
+        "What about old documents — PDFs, meeting minutes, that kind of thing? Are those being handled or is that a whole separate problem?",
         "How does your current tool integrate with your CMS?"
       ],
-      "pivot_to": "Auto-Remediation and CMS integrations. Emphasize that EqualGround removes the manual burden and plugs directly into their existing stack."
+      "pivot_to": "Lead with what their day looks like right now — someone fixing things one by one, new content breaking as fast as they fix old stuff, a pile of old documents nobody has touched. EqualGround takes that off their plate. Autopilot handles the straightforward fixes automatically. Structural Remediation Max handles the complex ones. Their job becomes reviewing, not doing."
     },
     "compliance_officer": {
       "titles": ["Compliance Officer", "Accessibility Coordinator", "ADA Coordinator", "504 Coordinator", "Civil Rights Officer", "Accessibility Director"],
@@ -59,7 +59,7 @@
       "trigger_phrases": ["no IT staff", "limited budget", "small county", "small town", "15000 budget", "do not have a developer", "one person handles", "we all wear many hats", "part time", "not technical"],
       "theme": "Simplicity, automation, affordability, no technical expertise available",
       "pain_points": [
-        "No dedicated IT staff — one person handles everything",
+        "One person wearing every hat — the website, the documents, the compliance questions, all of it",
         "Annual tech budget under $15,000",
         "50+ non-technical department heads managing web content",
         "Using a managed CMS like CivicPlus — cannot modify code",
@@ -69,9 +69,9 @@
         "How many people on your team are handling the web and document side of things?",
         "Are you using a managed platform like CivicPlus where your vendor controls the code?",
         "What does your annual technology budget look like for something like this?",
-        "Is the concern more about the document backlog or the ongoing web scanning?"
+        "Is the bigger issue the old PDFs and documents that haven't been touched yet, or keeping up with new stuff going forward?"
       ],
-      "pivot_to": "Autopilot and simplicity. Do not demo the full platform. Focus on: scan runs automatically, Autopilot fixes what it can, flags the rest with suggested fixes. Non-technical team does not need to touch code. Scope-based pricing means they only pay for their actual footprint — 100 pages and 5,000 docs is a very manageable quote."
+      "pivot_to": "They need the platform to do the work, not tell them what to do. Lead with Autopilot — it scans and fixes automatically, no technical knowledge needed. Their team doesn't touch code. The stuff it can't fix automatically gets flagged with suggested fixes, so it's still not starting from scratch. Keep the conversation simple. Don't demo the full platform. Pricing is based on what they actually have — a small county with a modest site and a few years of old PDFs is a very manageable number."
     },
     "commissioner_driven_buyer": {
       "titles": ["IT Director", "County Administrator", "IS Manager", "Web Manager"],
