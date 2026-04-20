@@ -14,15 +14,15 @@
   },
   "title_ii_compliance": {
     "regulation": "DOJ updated ADA Title II requiring all state/local government and public education websites and apps to meet WCAG 2.1 Level AA.",
-    "deadline_large": "April 24, 2026 — entities with populations over 50,000",
-    "deadline_small": "April 2027 — entities with populations under 50,000",
+    "deadline_large": "April 26, 2027 — entities with populations over 50,000",
+    "deadline_small": "April 26, 2028 — entities with populations under 50,000",
     "consequences": [
       "Civil rights lawsuits",
       "DOJ investigations",
       "Loss of federal funding",
       "Public complaints filed with Office of Civil Rights"
     ],
-    "urgency_note": "The April 2026 deadline is imminent. Most entities are not fully compliant. This is the primary urgency lever."
+    "urgency_note": "The DOJ issued an Interim Final Rule on April 20, 2026 extending both deadlines by one year. Large entities now have until April 26, 2027. Small entities until April 26, 2028. The extension was granted because the DOJ admitted it overestimated technology readiness — meaning the compliance work is real and harder than expected, not easier. Substantive requirements are unchanged. Private right of action still exists."
   },
   "pricing": {
     "model": "Based on total scope — web pages and documents (PDFs) across their digital footprint.",
