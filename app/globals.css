@@ -67,3 +67,22 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* ─── Content flash when talking points update ─── */
+.content-flash {
+  animation: contentFlash 0.5s ease-out;
+}
+@keyframes contentFlash {
+  0%   { background-color: rgba(251, 191, 36, 0.12); }
+  100% { background-color: transparent; }
+}
+
+/* ─── Copy confirmation ─── */
+.copy-confirm {
+  animation: copyFade 1.5s ease-out forwards;
+}
+@keyframes copyFade {
+  0%   { opacity: 1; color: #34d399; }
+  70%  { opacity: 1; color: #34d399; }
+  100% { opacity: 0; }
+}
