@@ -1188,6 +1188,34 @@ export default function Home() {
                       </ul>
                     </div>
                   )}
+
+                  {activeNavigation?.stage === "CTA" && (
+                    <div className="space-y-2 rounded-xl border border-blue-500/20 bg-gray-950/60 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-bold text-blue-300">📅 Book a Demo — Adam&apos;s Calendar</p>
+                        <a
+                          href="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                        >
+                          Open in new tab
+                        </a>
+                      </div>
+                      <div className="overflow-x-auto rounded-lg border border-blue-500/20 bg-black/30">
+                        <div className="h-[360px] min-w-[480px] overflow-hidden">
+                          <iframe
+                            src="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles"
+                            style={{ border: 0, transform: "scale(0.6)", transformOrigin: "top left" }}
+                            width="800"
+                            height="600"
+                            frameBorder="0"
+                            scrolling="no"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
