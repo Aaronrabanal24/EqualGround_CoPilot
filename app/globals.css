@@ -73,7 +73,7 @@
   animation: contentFlash 0.5s ease-out;
 }
 @keyframes contentFlash {
-  0%   { background-color: rgba(251, 191, 36, 0.12); border-radius: 8px; }
+  0%   { background-color: rgba(251, 191, 36, 0.12); }
   100% { background-color: transparent; }
 }
 

@@ -62,6 +62,8 @@ const CALENDAR_SCALE = CALENDAR_TARGET_WIDTH / CALENDAR_IFRAME_WIDTH;
 const CALENDAR_PANEL_HEIGHT_PCT = 100 - COACHING_PANEL_HEIGHT_PCT;
 const CALENDAR_WRAPPER_HEIGHT_PIXELS = CALENDAR_IFRAME_HEIGHT * CALENDAR_SCALE;
 const CALENDAR_WEEK_EMBED_URL = "https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles&mode=WEEK";
+const COPY_ICON = "📋";
+const COPIED_ICON = "✓";
 
 const GUIDE_OBJECTION_GROUPS = [
   {
@@ -228,8 +230,11 @@ export default function Home() {
   }, [kb, mapToStageNavigation]);
 
   const activeNavigation = guideNavigation;
-  const rawStageNum = Number.parseInt(guideNavigation?.stage_progress?.split("/")[0] ?? `${guideActiveStageIndex + 1}`, 10);
-  const currentStageNum = Number.isFinite(rawStageNum) && rawStageNum > 0 ? rawStageNum : 1;
+  const rawStageNum = Number.parseInt(guideNavigation?.stage_progress?.split("/")[0] ?? "0", 10);
+  const stageIdIndex = guideNavigation ? STAGE_IDS.indexOf(guideNavigation.stage) : -1;
+  const fallbackStageNum = stageIdIndex >= 0 ? stageIdIndex + 1 : guideActiveStageIndex + 1;
+  const currentStageNum = Number.isFinite(rawStageNum) && rawStageNum > 0 ? rawStageNum : (guideNavigation ? fallbackStageNum : 1);
+  const getStageLabel = (stage: KBStage, index: number) => STAGE_LABELS[index] ?? stage.name;
 
   return (
     <div className="flex h-screen w-full flex-col bg-gray-950 text-gray-100 font-sans">
@@ -281,7 +286,7 @@ export default function Home() {
                       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-800/40 transition-colors"
                     >
                       <div className="h-2 w-2 rounded-full bg-gray-700 shrink-0" />
-                      <span className="text-sm text-gray-400">{i + 1} · {STAGE_LABELS[i] ?? stage.name}</span>
+                      <span className="text-sm text-gray-400">{i + 1} · {getStageLabel(stage, i)}</span>
                     </button>
                   );
                 }
@@ -290,7 +295,7 @@ export default function Home() {
                   <div key={stage.id} className="border-l-2 border-blue-500 bg-blue-600/8 mx-2 rounded-r-lg mb-1">
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.6)] shrink-0" />
-                      <span className="text-sm font-semibold text-white">{i + 1} · {STAGE_LABELS[i] ?? stage.name}</span>
+                      <span className="text-sm font-semibold text-white">{i + 1} · {getStageLabel(stage, i)}</span>
                     </div>
 
                     {stage.few_shot?.[0]?.say_this && (
@@ -309,12 +314,13 @@ export default function Home() {
                           <button
                             key={si}
                             onClick={() => {
+                              const prospectText = shot.prospect ?? "";
                               setSelectedGuideItem({ tab: "stages", key: stage.id });
                               setExpandedTalkingPoints(new Set());
                               setGuideNavigation({
                                 stage: stage.id,
                                 tactic: "STAGE GUIDE",
-                                prospect_signal: shot.prospect ?? "",
+                                prospect_signal: prospectText,
                                 insight: "",
                                 talking_points: shot.say_this ? [shot.say_this] : [],
                                 objection_label: null,
@@ -565,7 +571,8 @@ export default function Home() {
               {!guideNavigation ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
                   <span className="text-2xl text-gray-600 mb-2">⬡</span>
-                  <p className="text-sm text-gray-500 whitespace-pre-line">Click any card on the left{"\n"}to see talking points and guidance.</p>
+                  <p className="text-sm text-gray-500 whitespace-pre-line">{`Click any card on the left
+to see talking points and guidance.`}</p>
                 </div>
               ) : (
                 <>
@@ -584,9 +591,9 @@ export default function Home() {
                               <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
                                 <span className="text-emerald-400 mt-0.5 text-base shrink-0">•</span>
                                 <div className="min-w-0 flex-1">
-                                  <span className="text-lg font-semibold text-white leading-snug">
+                                  <p className="text-lg font-semibold text-white leading-snug">
                                     {isExpanded ? point : firstSentence}
-                                  </span>
+                                  </p>
                                   {hasMore && (
                                     <button
                                       onClick={() => {
@@ -603,15 +610,21 @@ export default function Home() {
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(point);
-                                    setCopiedIndex(i);
-                                    setTimeout(() => setCopiedIndex(null), 1500);
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(point);
+                                      setCopiedIndex(i);
+                                      setTimeout(() => setCopiedIndex(null), 1500);
+                                    } catch (error) {
+                                      console.error("Failed to copy talking point:", error);
+                                      setCopiedIndex(null);
+                                    }
                                   }}
                                   className="ml-auto text-gray-600 hover:text-gray-300 text-xs px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                  aria-label={`Copy talking point ${i + 1}`}
+                                  aria-label={`Copy talking point ${i + 1} to clipboard`}
+                                  title={copiedIndex === i ? "Copied!" : "Copy talking point"}
                                 >
-                                  {copiedIndex === i ? <span className="copy-confirm">✓</span> : "📋"}
+                                  {copiedIndex === i ? <span className="copy-confirm">{COPIED_ICON}</span> : <span>{COPY_ICON}</span>}
                                 </button>
                               </li>
                             );
