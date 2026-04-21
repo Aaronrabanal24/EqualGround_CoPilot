@@ -86,6 +86,14 @@ type KBPayload = {
 
 const STAGE_LABELS = ["Gatekeeper", "Intro", "Credibility", "Discovery", "Pitch", "CTA"];
 const STAGE_IDS = ["GATEKEEPER", "INTRO", "CREDIBILITY", "DISCOVERY", "PITCH", "CTA"];
+const COACHING_PANEL_HEIGHT_PCT = 58;
+const CALENDAR_IFRAME_WIDTH = 800;
+const CALENDAR_IFRAME_HEIGHT = 600;
+const CALENDAR_TARGET_WIDTH = 440;
+const CALENDAR_SCALE = CALENDAR_TARGET_WIDTH / CALENDAR_IFRAME_WIDTH;
+const CALENDAR_PANEL_HEIGHT_PCT = 100 - COACHING_PANEL_HEIGHT_PCT;
+const CALENDAR_WRAPPER_HEIGHT_PIXELS = CALENDAR_IFRAME_HEIGHT * CALENDAR_SCALE;
+const CALENDAR_WEEK_EMBED_URL = "https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles&mode=WEEK";
 
 const GUIDE_OBJECTION_GROUPS = [
   {
@@ -1057,7 +1065,7 @@ export default function Home() {
           </div>
 
           <div className="w-2/5 flex flex-col bg-gray-900/50">
-            <div className="h-[58%] min-h-0 flex flex-col overflow-hidden">
+            <div className="min-h-0 flex flex-col overflow-hidden" style={{ height: `${COACHING_PANEL_HEIGHT_PCT}%` }}>
               <div className="px-6 py-4 border-b border-gray-800/60">
                 <div className="flex gap-1 mb-3">
                   {STAGE_LABELS.map((label, i) => {
@@ -1206,11 +1214,11 @@ export default function Home() {
               )}
             </div>
 
-            <div className="h-[42%] min-h-0 border-t border-gray-800/60 bg-gray-900/50 px-4 py-3">
+            <div className="min-h-0 border-t border-gray-800/60 bg-gray-900/50 px-4 py-3" style={{ height: `${CALENDAR_PANEL_HEIGHT_PCT}%` }}>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-xs font-bold text-blue-300">📅 Adam&apos;s Calendar</p>
                 <a
-                  href="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles&mode=WEEK"
+                  href={CALENDAR_WEEK_EMBED_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
@@ -1218,12 +1226,12 @@ export default function Home() {
                   Open in new tab ↗
                 </a>
               </div>
-              <div className="h-[330px] overflow-hidden rounded-lg border border-gray-800/70 bg-black/30">
+              <div className="overflow-hidden rounded-lg border border-gray-800/70 bg-black/30" style={{ height: `${CALENDAR_WRAPPER_HEIGHT_PIXELS}px` }}>
                 <iframe
-                  src="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles&mode=WEEK"
-                  style={{ border: 0, transform: "scale(0.55)", transformOrigin: "top left" }}
-                  width="800"
-                  height="600"
+                  src={CALENDAR_WEEK_EMBED_URL}
+                  style={{ border: 0, transform: `scale(${CALENDAR_SCALE})`, transformOrigin: "top left" }}
+                  width={CALENDAR_IFRAME_WIDTH}
+                  height={CALENDAR_IFRAME_HEIGHT}
                   frameBorder="0"
                   scrolling="no"
                 />
