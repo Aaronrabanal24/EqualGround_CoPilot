@@ -86,6 +86,14 @@ type KBPayload = {
 
 const STAGE_LABELS = ["Gatekeeper", "Intro", "Credibility", "Discovery", "Pitch", "CTA"];
 const STAGE_IDS = ["GATEKEEPER", "INTRO", "CREDIBILITY", "DISCOVERY", "PITCH", "CTA"];
+const COACHING_PANEL_HEIGHT_PCT = 58;
+const CALENDAR_IFRAME_WIDTH = 800;
+const CALENDAR_IFRAME_HEIGHT = 600;
+const CALENDAR_TARGET_WIDTH = 440;
+const CALENDAR_SCALE = CALENDAR_TARGET_WIDTH / CALENDAR_IFRAME_WIDTH;
+const CALENDAR_PANEL_HEIGHT_PCT = 100 - COACHING_PANEL_HEIGHT_PCT;
+const CALENDAR_WRAPPER_HEIGHT_PIXELS = CALENDAR_IFRAME_HEIGHT * CALENDAR_SCALE;
+const CALENDAR_WEEK_EMBED_URL = "https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles&mode=WEEK";
 
 const GUIDE_OBJECTION_GROUPS = [
   {
@@ -1057,180 +1065,178 @@ export default function Home() {
           </div>
 
           <div className="w-2/5 flex flex-col bg-gray-900/50">
-            <div className="px-6 py-4 border-b border-gray-800/60">
-              <div className="flex gap-1 mb-3">
-                {STAGE_LABELS.map((label, i) => {
-                  const step = i + 1;
-                  const isActive = step === currentStageNum;
-                  const isDone = step < currentStageNum;
-                  const canClickLiveStage = appMode === "live";
-                  return (
-                    <button
-                      key={label}
-                      onClick={() => {
-                        if (canClickLiveStage && wsRef.current?.readyState === WebSocket.OPEN) {
-                          wsRef.current.send(JSON.stringify({ type: "set_stage", stage: STAGE_IDS[i] }));
-                        }
-                      }}
-                      className={`flex-1 flex flex-col items-center gap-1.5 group ${canClickLiveStage ? "cursor-pointer" : "cursor-default"}`}
-                    >
-                      <div
-                        className={`h-1 w-full rounded-full transition-all duration-500 ${
-                          isDone
-                            ? "bg-emerald-500 group-hover:bg-emerald-400"
-                            : isActive
-                              ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
-                              : "bg-gray-700"
-                        }`}
-                      />
-                      <span
-                        className={`font-semibold uppercase tracking-wider transition-colors ${
-                          isDone
-                            ? "text-[9px] text-emerald-500"
-                            : isActive
-                              ? "text-xs text-blue-300"
-                              : "text-[9px] text-gray-600"
-                        }`}
+            <div className="min-h-0 flex flex-col overflow-hidden" style={{ height: `${COACHING_PANEL_HEIGHT_PCT}%` }}>
+              <div className="px-6 py-4 border-b border-gray-800/60">
+                <div className="flex gap-1 mb-3">
+                  {STAGE_LABELS.map((label, i) => {
+                    const step = i + 1;
+                    const isActive = step === currentStageNum;
+                    const isDone = step < currentStageNum;
+                    const canClickLiveStage = appMode === "live";
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => {
+                          if (canClickLiveStage && wsRef.current?.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({ type: "set_stage", stage: STAGE_IDS[i] }));
+                          }
+                        }}
+                        className={`flex-1 flex flex-col items-center gap-1.5 group ${canClickLiveStage ? "cursor-pointer" : "cursor-default"}`}
                       >
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <div
+                          className={`h-1 w-full rounded-full transition-all duration-500 ${
+                            isDone
+                              ? "bg-emerald-500 group-hover:bg-emerald-400"
+                              : isActive
+                                ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
+                                : "bg-gray-700"
+                          }`}
+                        />
+                        <span
+                          className={`font-semibold uppercase tracking-wider transition-colors ${
+                            isDone
+                              ? "text-[9px] text-emerald-500"
+                              : isActive
+                                ? "text-xs text-blue-300"
+                                : "text-[9px] text-gray-600"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
-                  {activeNavigation?.stage && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1">
-                      <span className="text-xs font-bold text-blue-400">{activeNavigation.stage}</span>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    {activeNavigation?.stage && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1">
+                        <span className="text-xs font-bold text-blue-400">{activeNavigation.stage}</span>
+                      </span>
+                    )}
+                  </div>
+                  {activeNavigation?.objection_label && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1 objection-flash">
+                      <div className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                      <span className="text-xs font-bold text-red-400">{activeNavigation.objection_label}</span>
                     </span>
                   )}
                 </div>
-                {activeNavigation?.objection_label && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1 objection-flash">
-                    <div className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                    <span className="text-xs font-bold text-red-400">{activeNavigation.objection_label}</span>
+              </div>
+
+              {activeNavigation?.tactic && (
+                <div className="px-6 pt-4">
+                  <span className="inline-block rounded-md bg-gray-800 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-gray-400">
+                    {activeNavigation.tactic}
                   </span>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
+                {appMode === "guide" && !guideNavigation ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <span className="text-2xl text-gray-600 mb-2">⬡</span>
+                    <p className="text-sm text-gray-500 whitespace-pre-line">Click any card on the left{"\n"}to see talking points and guidance.</p>
+                  </div>
+                ) : showListeningPlaceholder ? (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="text-gray-500 text-sm text-center italic">Listening for prospect signals...</p>
+                  </div>
+                ) : (
+                  <>
+                    {activeNavigation?.prospect_signal && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-1.5">🔵 What&apos;s Happening</p>
+                        <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out whitespace-pre-line">{activeNavigation.prospect_signal}</p>
+                      </div>
+                    )}
+
+                    {activeNavigation?.insight && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1.5">💡 Your Angle</p>
+                        <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out whitespace-pre-line">{activeNavigation.insight}</p>
+                      </div>
+                    )}
+
+                    {activeNavigation && activeNavigation.talking_points.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">Say This</p>
+                        <ul className="space-y-2">
+                          {activeNavigation.talking_points.map((point, i) => {
+                            const firstSentenceEnd = point.search(/[.!?](\s|$)/);
+                            const firstSentence = firstSentenceEnd > 0 ? point.slice(0, firstSentenceEnd + 1) : point;
+                            const hasMore = firstSentence.length < point.length;
+                            const isExpanded = expandedTalkingPoints.has(i);
+
+                            return (
+                              <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
+                                <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
+                                <div className="min-w-0">
+                                  <span className="text-base font-medium leading-relaxed text-white">
+                                    {isExpanded ? point : firstSentence}
+                                  </span>
+                                  {hasMore && (
+                                    <button
+                                      onClick={() => {
+                                        setExpandedTalkingPoints((prev) => {
+                                          const next = new Set(prev);
+                                          if (next.has(i)) next.delete(i); else next.add(i);
+                                          return next;
+                                        });
+                                      }}
+                                      className="ml-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                    >
+                                      {isExpanded ? "less" : "+ more"}
+                                    </button>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            </div>
 
-            {activeNavigation?.tactic && (
-              <div className="px-6 pt-4">
-                <span className="inline-block rounded-md bg-gray-800 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-gray-400">
-                  {activeNavigation.tactic}
-                </span>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
-              {appMode === "guide" && !guideNavigation ? (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <span className="text-2xl text-gray-600 mb-2">⬡</span>
-                  <p className="text-sm text-gray-500 whitespace-pre-line">Click any card on the left{"\n"}to see talking points and guidance.</p>
+              {activeNavigation?.next_milestone && (
+                <div className="px-6 py-4 border-t border-gray-800/60">
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-600 mt-0.5 text-sm">→</span>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-0.5">Next Goal</p>
+                      <p className="text-xs text-gray-400 leading-relaxed">{activeNavigation.next_milestone}</p>
+                    </div>
+                  </div>
                 </div>
-              ) : showListeningPlaceholder ? (
-                <div className="flex h-full items-center justify-center">
-                  <p className="text-gray-500 text-sm text-center italic">Listening for prospect signals...</p>
-                </div>
-              ) : (
-                <>
-                  {activeNavigation?.prospect_signal && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-1.5">🔵 What&apos;s Happening</p>
-                      <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out whitespace-pre-line">{activeNavigation.prospect_signal}</p>
-                    </div>
-                  )}
-
-                  {activeNavigation?.insight && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1.5">💡 Your Angle</p>
-                      <p className="text-sm leading-relaxed text-gray-300 transition-all duration-500 ease-in-out whitespace-pre-line">{activeNavigation.insight}</p>
-                    </div>
-                  )}
-
-                  {activeNavigation && activeNavigation.talking_points.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-2">Say This</p>
-                      <ul className="space-y-2">
-                        {activeNavigation.talking_points.map((point, i) => {
-                          const firstSentenceEnd = point.search(/[.!?](\s|$)/);
-                          const firstSentence = firstSentenceEnd > 0 ? point.slice(0, firstSentenceEnd + 1) : point;
-                          const hasMore = firstSentence.length < point.length;
-                          const isExpanded = expandedTalkingPoints.has(i);
-
-                          return (
-                            <li key={i} className="flex items-start gap-2.5 transition-all duration-500 ease-in-out">
-                              <span className="text-emerald-500 mt-0.5 text-sm shrink-0">•</span>
-                              <div className="min-w-0">
-                                <span className="text-base font-medium leading-relaxed text-white">
-                                  {isExpanded ? point : firstSentence}
-                                </span>
-                                {hasMore && (
-                                  <button
-                                    onClick={() => {
-                                      setExpandedTalkingPoints((prev) => {
-                                        const next = new Set(prev);
-                                        if (next.has(i)) next.delete(i); else next.add(i);
-                                        return next;
-                                      });
-                                    }}
-                                    className="ml-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                                  >
-                                    {isExpanded ? "less" : "+ more"}
-                                  </button>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-
-                  {activeNavigation?.stage === "CTA" && (
-                    <div className="space-y-2 rounded-xl border border-blue-500/20 bg-gray-950/60 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-bold text-blue-300">📅 Book a Demo — Adam&apos;s Calendar</p>
-                        <a
-                          href="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                        >
-                          Open in new tab
-                        </a>
-                      </div>
-                      <div className="overflow-x-auto rounded-lg border border-blue-500/20 bg-black/30">
-                        <div className="h-[360px] min-w-[480px] overflow-hidden">
-                          <iframe
-                            src="https://calendar.google.com/calendar/embed?src=adam.mustafa%40yuja.com&ctz=America%2FLos_Angeles"
-                            style={{ border: 0, transform: "scale(0.6)", transformOrigin: "top left" }}
-                            width="800"
-                            height="600"
-                            frameBorder="0"
-                            scrolling="no"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
             </div>
 
-            {activeNavigation?.next_milestone && (
-              <div className="px-6 py-4 border-t border-gray-800/60">
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-600 mt-0.5 text-sm">→</span>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-0.5">Next Goal</p>
-                    <p className="text-xs text-gray-400 leading-relaxed">{activeNavigation.next_milestone}</p>
-                  </div>
-                </div>
+            <div className="min-h-0 border-t border-gray-800/60 bg-gray-900/50 px-4 py-3" style={{ height: `${CALENDAR_PANEL_HEIGHT_PCT}%` }}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-bold text-blue-300">📅 Adam&apos;s Calendar</p>
+                <a
+                  href={CALENDAR_WEEK_EMBED_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                >
+                  Open in new tab ↗
+                </a>
               </div>
-            )}
+              <div className="overflow-hidden rounded-lg border border-gray-800/70 bg-black/30" style={{ height: `${CALENDAR_WRAPPER_HEIGHT_PIXELS}px` }}>
+                <iframe
+                  src={CALENDAR_WEEK_EMBED_URL}
+                  style={{ border: 0, transform: `scale(${CALENDAR_SCALE})`, transformOrigin: "top left" }}
+                  width={CALENDAR_IFRAME_WIDTH}
+                  height={CALENDAR_IFRAME_HEIGHT}
+                  frameBorder="0"
+                  scrolling="no"
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
