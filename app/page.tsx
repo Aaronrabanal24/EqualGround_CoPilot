@@ -229,6 +229,9 @@ export default function Home() {
   const activeNavigation = guideNavigation;
   const rawStageNum = Number.parseInt(activeNavigation?.stage_progress?.split("/")[0] ?? "1", 10);
   const currentStageNum = Number.isFinite(rawStageNum) && rawStageNum > 0 ? rawStageNum : 1;
+  const selectStage = (index: number) => {
+    if (stages[index]) mapToStageNavigation(stages[index]);
+  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-gray-950 text-gray-100 font-sans">
@@ -517,9 +520,7 @@ export default function Home() {
                     return (
                       <button
                         key={label}
-                        onClick={() => {
-                          if (stages[i]) mapToStageNavigation(stages[i]);
-                        }}
+                        onClick={() => selectStage(i)}
                         className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer"
                       >
                         <div
